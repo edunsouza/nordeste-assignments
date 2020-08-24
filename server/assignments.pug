@@ -1,0 +1,326 @@
+- var rowsHeight = isMobile ? 'height: 30px;' : '';
+
+div(style=`
+    padding: ${isMobile ? '5px' : '15px'};
+    background-color: #ffffff;
+    font-size: ${isMobile ? '12px' : '12pt'};
+    font-family: 'Arial', sans-serif;
+    color: #222a35;`)
+    p(style="font-weight: bold;") Caros Irmãos, saudações.
+    p(style="padding-bottom: 5px;") Abaixo, seguem as designações da semana:
+
+
+    //- WEEKEND
+
+
+    table(style="border: 1px solid #222a35; border-collapse: collapse; min-width: 40%; color: #222a35;")
+        thead
+            tr
+                td(colspan=`2` style=`
+                    color: #ff0000;
+                    font-weight: bold;
+                    padding: 5px;
+                    font-size: ${isMobile ? '10px' : '12pt'};
+                    text-align: center`) REUNIÃO DE 
+                    span(style="text-decoration: underline") DOMINGO
+        tbody
+            tr(style="text-align: center;")
+                td(style="border: 1px solid #222a35; padding: 5px; font-weight: bold; text-transform: uppercase;")= weekend.chairman_1.text
+                td(style="border: 1px solid #222a35; padding: 5px; text-transform: uppercase;")= weekend.chairman_1.value
+            tr(style="text-align: center;")
+                td(style="border: 1px solid #222a35; padding: 5px; font-weight: bold; text-transform: uppercase;")= weekend.reader_2.text
+                td(style="border: 1px solid #222a35; padding: 5px; text-transform: uppercase;")= weekend.reader_2.value
+
+
+    //- WEEK
+
+
+    p(style=`
+        color: #ff0000;
+        font-weight: bold;
+        padding-top: 10px;
+        text-align: left;
+        font-size: ${isMobile ? '10px' : '12pt'};`) REUNIÃO DE 
+        span(style=`text-decoration: underline`) QUINTA-FEIRA
+
+    div(style=`
+        border: 1px solid #222a35;
+        display: flex;
+        align-items: center;
+        min-width: ${isMobile ? '60%' : '100%'};
+        font-size: ${isMobile ? '8px' : '11pt'};
+        font-family: 'Arial',sans-serif;
+        color: #222a35;`)
+
+        table(style="width: 100%;")
+            tbody
+                tr
+                    td
+                        span(style=`
+                            font-weight: 600;
+                            font-size: ${isMobile ? '7px' : '16px'};
+                            color: ${week.intro.color};
+                            ${isMobile ? 'padding: 3px' : ''};
+                            padding-left: 5px;
+                            background-color: ${week.intro.tone};`)= week.intro.title
+                    td(style="text-align: right;")
+                        span(style=`
+                            color: #888888;
+                            padding-right: ${isMobile ? '0px' : '10px'};`) Presidente:
+                    td
+                        span= week.chairman
+
+                tr
+                    td(colspan="2" style="text-align: right; padding-bottom: 35px")
+                        span(style=`
+                            color: #888888;
+                            padding-right: ${isMobile ? '0px' : '10px'};`) Conselheiro da sala B:
+                    td(style="text-align: left; padding-bottom: 35px")
+                        span -
+
+                each introRow in week.intro.items
+                    tr(style=rowsHeight)
+                        td
+                            div(style=`display: flex; align-items: center;`)
+                                span(style=`
+                                    color: #888888;
+                                    padding: ${isMobile ? '2px' : '0 10px'};
+                                    height: 100%`) #{isMobile ? '' : '00:00'}
+                                span(style=`
+                                    font-size: ${isMobile ? '8px' : '24px'};
+                                    padding-right: 5px;`)= '•'
+                                span(style=`
+                                    color: ${week.intro.itemsTone};
+                                    background-color: ${week.intro.tone};`)= introRow.text
+
+                        if introRow.chairmanAssigned
+                            td(colspan="2")
+                                span
+                        else
+                            td(style="text-align: right;")
+                                span(style=`
+                                    color: #888888;
+                                    padding-right: ${isMobile ? '0px' : '10px'};`)= introRow.text.toLowerCase().includes('oração') ? 'Oração:' : ''
+                            td
+                                span(style=`text-transform: capitalize;`)= introRow.assignee
+
+                tr(style="height: 25px")
+
+                tr
+                    td
+                        div(style=`
+                            background-color: ${week.treasures.tone};
+                            display: flex;
+                            padding: 5px 0;
+                            align-items: center;`)
+                            span(style=`
+                                font-size: ${isMobile ? '7px' : '16px'};
+                                padding-left: 5px;
+                                ${isMobile ? 'padding: 3px' : ''};
+                                color: ${week.treasures.color};`)= week.treasures.title
+                    td
+                        span(style=`
+                            text-align: left;
+                            font-size: ${isMobile ? '6px' : '12px'};
+                            font-weight: 600;
+                            padding: ${isMobile ? '2px 10px' : '10px'};
+                            padding-left: 5px;`) Sala B
+                    td
+                        span(style=`
+                            text-align: left;
+                            font-size: ${isMobile ? '6px' : '12px'};
+                            font-weight: 600;`) Salão principal
+
+                each treasuresRow in week.treasures.items
+                    tr(style=rowsHeight)
+                        td(style=`display: flex; align-items: center; justify-content: space-between;`)
+                            div(style=`display: flex; align-items: center;`)
+                                span(style=`
+                                    color: #888888;
+                                    padding: ${isMobile ? '2px' : '0 10px'};
+                                    height: 100%`) #{isMobile ? '' : '00:00'}
+                                span(style=`
+                                    color: ${week.treasures.tone};
+                                    font-size: ${isMobile ? '8px' : '24px'};
+                                    padding-right: 5px;`)= '•'
+                                span= treasuresRow.text
+
+                            if treasuresRow.text.toLowerCase().includes('leitura')
+                                span(style=`
+                                    text-align: right;
+                                    color: #888888;
+                                    padding-right: ${isMobile ? '0px' : '10px'}`) Estudante:
+
+                        td
+                            span= treasuresRow.text.toLowerCase().includes('leitura') ? '-' : ''
+
+                        td
+                            span(style=`text-transform: capitalize;`)= treasuresRow.assignee
+
+                tr(style="height: 25px")
+
+                tr
+                    td
+                        div(style=`
+                            background-color: ${week.ministry.tone};
+                            display: flex;
+                            padding: 5px 0;
+                            align-items: center;`)
+                            span(style=`
+                                font-size: ${isMobile ? '7px' : '16px'};
+                                padding-left: 5px;
+                                ${isMobile ? 'padding: 3px' : ''};
+                                color: ${week.ministry.color};`)= week.ministry.title
+                    td
+                        span(style=`
+                            text-align: left;
+                            font-size: ${isMobile ? '6px' : '12px'};
+                            font-weight: 600;
+                            padding: ${isMobile ? '2px 10px' : '10px'};
+                            padding-left: 5px;`) Sala B
+                    td
+                        span(style=`
+                            text-align: left;
+                            font-size: ${isMobile ? '6px' : '12px'};
+                            font-weight: 600;`) Salão principal
+
+                each ministryRow in week.ministry.items
+                    tr(style=rowsHeight)
+                        td
+                            div(style=`display: flex; align-items: center; justify-content: space-between;`)
+                                div(style=`display: flex; align-items: center;`)
+                                    span(style=`
+                                        color: #888888;
+                                        padding: ${isMobile ? '2px' : '0 10px'};
+                                        height: 100%`) #{isMobile ? '' : '00:00'}
+                                    span(style=`
+                                        color: ${week.ministry.tone};
+                                        font-size: ${isMobile ? '8px' : '24px'};
+                                        padding-right: 5px;`)= '•'
+                                    span= ministryRow.text
+
+                                if ministryRow.hasPair
+                                    div
+                                        span(style=`
+                                            word-break: break-word;
+                                            text-align: right;
+                                            color: #888888;
+                                            padding-right: ${isMobile ? '0px' : '10px'}`) Estudante / ajudante:
+
+                        td
+                            if ministryRow.hasPair
+                                span -
+
+                        td
+                            span(style=`text-transform: capitalize;`)= ministryRow.hasPair ? `${ministryRow.assignee} / ${ministryRow.pair}` : ministryRow.assignee
+
+                tr(style="height: 25px")
+
+                tr
+                    td
+                        div(style=`
+                            background-color: ${week.living.tone};
+                            display: flex;
+                            padding: 5px 0;
+                            align-items: center;`)
+                            span(style=`
+                                font-size: ${isMobile ? '7px' : '16px'};
+                                ${isMobile ? 'padding: 3px' : ''};
+                                padding-left: 5px;
+                                color: ${week.living.color};`)= week.living.title
+
+                    td(colspan="2")
+
+                each livingRow in week.living.items
+                    tr(style=rowsHeight)
+                        td
+                            div(style=`display: flex; align-items: center; justify-content: space-between;`)
+                                div(style=`display: flex; align-items: center;`)
+                                    span(style=`
+                                        color: #888888;
+                                        padding: ${isMobile ? '2px' : '0 10px'};
+                                        height: 100%`) #{isMobile ? '' : '00:00'}
+                                    span(style=`
+                                        color: ${week.living.tone};
+                                        font-size: ${isMobile ? '8px' : '24px'};
+                                        padding-right: 5px`)= '•'
+                                    span= livingRow.text
+
+                        if livingRow.hasPair
+                            td(style="text-align: right;")
+                                span(style=`
+                                    text-align: right;
+                                    color: #888888;
+                                    word-break: break-word;
+                                    padding-right: 10px`) Dirigente / Leitor:
+                            td
+                                span(style=`text-transform: capitalize;`)= `${livingRow.assignee} / ${livingRow.pair}`
+
+                        else if livingRow.text.toLowerCase().includes('oração')
+                            td(style="text-align: right;")
+                                span(style=`color: #888888; padding-right: 10px`) Oração:
+                            td
+                                span(style=`text-transform: capitalize;`)= livingRow.assignee
+
+                        else if livingRow.chairmanAssigned || !livingRow.assignee
+                            td(colspan="2")
+                        else
+                            td
+                            td
+                                span(style=`text-transform: capitalize;`)= livingRow.assignee
+
+
+    //- CLEANING
+
+
+    p -
+    p(style=`
+        color: #ff0000;
+        font-weight: bold;
+        text-decoration: underline;
+        text-decoration-color: #222a35;
+        text-align: left;`) ARRANJO DE LIMPEZA E MANUTENÇÃO DO SALÃO DURANTE A PANDEMIA:
+    p(style=`
+        font-size: ${isMobile ? '10px' : '12pt'};
+        font-family: 'Arial',sans-serif;
+        color: #222a35;
+    `) Durante #{dayWeekBegins || '[...]'} até #{dayWeekEnds || '[...]'} tal incumbência estará a cargo da 
+        if cleaning.cleaning_group_2
+            span(style=`font-weight: bold; text-decoration: underline`) nossa
+            span(style=`font-weight: bold`)  congregação (Nordeste), grupo "#{String(cleaning.cleaning_group_2.value).toUpperCase()}"
+        else
+            span(style=`font-weight: bold`) congregação #{String(cleaning.cleaning_1.value).toUpperCase()}.
+
+
+    //- MINISTRY
+
+
+    p -
+    p(style=`
+        color: #ff0000;
+        font-weight: bold;
+        text-decoration: underline;
+        text-decoration-color: #222a35;
+        text-align: left`) DIRIGENTES - MINISTÉRIO:
+
+    table(style=`
+        border: 1px solid #222a35;
+        border-collapse: collapse;
+        min-width: 40%;
+        font-size: ${isMobile ? '10px' : '12pt'};
+        font-family: 'Arial',sans-serif;
+        color: #222a35;`)
+        tbody
+            each tRow in Object.values(ministry)
+                tr(style=`text-align: center;`)
+                    td(style=`
+                        border: 1px solid #222a35;
+                        padding: 15px;
+                        font-weight: bold;
+                        text-transform: capitalize;`)= tRow.text
+
+                    td(style=`text-transform: uppercase; border: 1px solid #222a35; padding: 15px; text-transform: uppercase;`)= tRow.value
+
+
+    p(style=`font-weight: bold; margin-bottom: 0; padding-bottom: 5px;`) Atenciosamente,
+    p(style=`font-weight: bold; margin: 0; padding: 0px; text-transform: capitalize;`) #{(loggedUser || '').toLowerCase()}.
