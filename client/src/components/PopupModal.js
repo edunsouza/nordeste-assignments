@@ -9,10 +9,11 @@ import {
     FormControl,
     InputLabel,
     OutlinedInput,
-    Typography
+    Typography,
+    Box
 } from '@material-ui/core';
 
-export default function PopupModal({ isOpen, onClose, title, content, onConfirm, hasInput, inputLabel }) {
+export default function PopupModal({ isOpen, onClose, title, content, onConfirm, hasInput, inputLabel, confirmOnly = false }) {
     const [text, setText] = useState('');
     const close = () => {
         document.body.style.overflow = 'auto';
@@ -47,23 +48,25 @@ export default function PopupModal({ isOpen, onClose, title, content, onConfirm,
         <Dialog open={Boolean(isOpen)} onClose={close} {...TransitionComponent} fullWidth={true} maxWidth="xs">
             <DialogTitle>{title}</DialogTitle>
             <DialogContent>
-                {!hasInput
+                {typeof content === 'string'
                     ? <Typography>{content}</Typography>
-                    : <>
-                        <FormControl style={{ width: '100%' }}>
-                            <InputLabel style={{ left: '15px', top: '-5px' }}>{inputLabel}</InputLabel>
-                            <OutlinedInput
-                                label={inputLabel}
-                                value={text}
-                                onChange={x => setText(x.target.value)} />
-                        </FormControl>
-                    </>
+                    : <Box>{content}</Box>
                 }
+
+                {hasInput && <FormControl style={{ width: '100%' }}>
+                    <InputLabel style={{ left: '15px', top: '-5px' }}>{inputLabel}</InputLabel>
+                    <OutlinedInput
+                        label={inputLabel}
+                        value={text}
+                        autoFocus={true}
+                        onChange={x => setText(x.target.value)} />
+                </FormControl>}
+
             </DialogContent>
             <DialogActions>
-                <Button color="primary" onClick={close}>Cancelar</Button>
+                {!confirmOnly && <Button color="primary" onClick={close}>Cancelar</Button>}
                 <Button color="primary" onClick={confirm}>OK</Button>
             </DialogActions>
-        </Dialog>
+        </Dialog >
     );
 }

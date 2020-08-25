@@ -95,7 +95,7 @@ export default function AssignmentsPreview() {
     })();
 
     return (
-        <Paper>
+        <Paper elevation={2}>
             <PopupModal
                 content={'Seu dispositivo possui uma tela estreita. Vire-o na horizontal para visualizar melhor o conteúdo abaixo!'}
                 isOpen={isModalOpen}
@@ -103,14 +103,14 @@ export default function AssignmentsPreview() {
                 onConfirm={() => setModalOpen(false)}
             />
 
-            {loading && <Box className={classes.loadingPreview}>
+            {loading && <Box m={1} mt={3} p={1} pb={5} className={classes.loadingPreview}>
                 <CircularProgress />
                 <Typography color="primary">
                     Carregando exibição...
                 </Typography>
             </Box>}
 
-            {!loading && <Box className={classes.preview}>
+            {!loading && <Box m={1} mt={3} p={1} pb={5} className={classes.preview}>
                 <div dangerouslySetInnerHTML={{ __html: preview.html }} />
             </Box>}
         </Paper>

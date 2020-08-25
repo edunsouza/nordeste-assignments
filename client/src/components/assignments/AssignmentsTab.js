@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { makeStyles } from '@material-ui/styles';
 import { Navigation as NavigationIcon } from '@material-ui/icons';
@@ -15,6 +15,7 @@ import StepByStep from '../StepByStep';
 export default function AssignmentsTab() {
     const pageTop = useRef();
     const form = useForm();
+    const [isFinished, setFinished] = useState(false);
 
     const steps = [
         {
@@ -32,7 +33,7 @@ export default function AssignmentsTab() {
             content: (<AssignmentsPreview />)
         },
         {
-            callback: () => console.log('===================== Enviar ====================='),
+            callback: () => { },
             label: 'Enviar designações',
             hint: 'Se está tudo certo, selecione o botão com ícone de envelope para enviar',
             content: (<AssignmentsPublication />)
@@ -52,18 +53,21 @@ export default function AssignmentsTab() {
                 <StepByStep
                     steps={steps}
                     feedback={'As designações dessa semana foram enviadas!'}
-                    conclusionStep={<h1>FIM!</h1>}
+                    onConclude={() => setFinished(true)}
+                    onReset={() => setFinished(false)}
+                    onNext={stepId => setFinished(stepId >= 2)}
+                    onBack={stepId => setFinished(stepId >= 2)}
                 />
             </Box>
 
-            <Fab
+            {!isFinished && <Fab
                 variant="extended"
                 color="primary"
                 className={classes.goTopFab}
                 onClick={() => scrollToElement(pageTop.current, 'start')}
             >
                 <NavigationIcon /> Topo
-            </Fab>
+            </Fab>}
         </>
     );
 }
