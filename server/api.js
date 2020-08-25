@@ -101,6 +101,9 @@ module.exports = app => {
             const previewCache = { ...previewData };
             delete previewCache.isMobile;
 
+            // clear other previews (async)
+            Cache.deleteMany({ dayWeekBegins: { $nin: [dayWeekBegins] } });
+
             // store or update cache
             const hasCache = await Cache.find({ dayWeekBegins }).catch(e => false);
             if (!hasCache || !hasCache.length) {
@@ -127,15 +130,14 @@ module.exports = app => {
         try {
             const contacts = await Contacts.find().lean();
             res.status(200).json(contacts.map(({ name, address }) => ({ name, address })));
-        } catch (e) {
-            console.log(e);
+        } catch (error) {
+            console.log(error);
             res.status(400).json({ error: 'Não foi possível obter os contatos' });
         }
     });
 
     // TODO
     app.post('/contacts', async (req, res) => {
-        // const { exemple } = req.body
         res.json({ error: 'not created yet.' });
     });
 
@@ -143,8 +145,8 @@ module.exports = app => {
         try {
             const groups = await CleaningGroups.find().lean();
             res.status(200).json(groups.map(({ name, groupId: id }) => ({ name, id })));
-        } catch (e) {
-            console.log(e);
+        } catch (error) {
+            console.log(error);
             res.status(400).json({ error: 'Não foi possível obter os grupos de limpeza' });
         }
     });
@@ -159,9 +161,9 @@ module.exports = app => {
                 name: req.body.name,
             });
             res.status(200).json({ message: 'Grupo criado com sucesso!' });
-        } catch (e) {
-            console.log(e);
-            res.status(400).json({ e: e, error: 'Não foi possível criar o grupo de limpeza' });
+        } catch (error) {
+            console.log(error);
+            res.status(400).json({ error: 'Não foi possível criar o grupo de limpeza' });
         }
     });
 
@@ -172,23 +174,11 @@ module.exports = app => {
 
     // TODO
     app.get('/last-assignments/:contactId', async (req, res) => {
-        // req.params.contactId
         res.json({ error: 'not created yet.' });
     });
 
     app.get('/meeting-workbook', async (req, res) => {
         try {
-
-
-
-
-
-            // const data = require('fs').readFileSync(__dirname + '/../mocks/jw.txt', { encoding: 'utf-8' });
-
-
-
-
-
             const { data } = await axios.get(getDynamicUrl());
             const $ = cheerio.load(data);
             let sectionPosition = 1;
