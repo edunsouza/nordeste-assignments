@@ -16,7 +16,7 @@ export const scrollToElement = (element, position = 'center') => {
     element.scrollIntoView({ behavior: 'smooth', block: position });
 };
 
-export const submitReactFormHook = (form = {}, callback = () => { }) => {
+export const submitReactFormHook = (form = {}) => {
     const control = form.control && form.control.fieldsRef && form.control.fieldsRef.current;
     if (!control) {
         return false;
@@ -48,4 +48,10 @@ export const requiredFormValidation = {
         )
         || 'Este campo é obrigatório'
     )
+};
+
+export const emailIfValid = email => {
+    if (typeof email === 'string' && /(.+)@(.+){2,}\.(.+){2,}/.test(email)) {
+        return email;
+    }
 };

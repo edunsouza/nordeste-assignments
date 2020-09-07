@@ -9,7 +9,7 @@ import MetricsTab from './MetricsTab';
 
 function SegmentedContent({ children, value, index }) {
 	return (
-		<Container hidden={value !== index}>
+		<Container hidden={value !== index} style={{ minHeight: '250px' }} >
 			{value === index && children}
 		</Container>
 	);

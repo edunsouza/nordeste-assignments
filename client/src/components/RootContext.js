@@ -29,7 +29,19 @@ const assignmentsReducer = (oldState, { type, data }) => {
         case 'SET_PARTS':
             return { ...oldState, parts: data };
         case 'SET_CONTACTS':
-            return { ...oldState, contacts: data };
+            return {
+                ...oldState,
+                contacts: data.sort(({ text: nameA = '' }, { text: nameB = '' }) => nameA.toUpperCase() > nameB.toUpperCase() ? 1 : -1)
+            };
+        case 'ADD_CONTACT':
+            const newContact = { text: data.name, value: data.address };
+            return {
+                ...oldState,
+                contacts: [
+                    ...oldState.contacts,
+                    newContact
+                ].sort(({ text: nameA = '' }, { text: nameB = '' }) => nameA.toUpperCase() > nameB.toUpperCase() ? 1 : -1)
+            };
         case 'SET_CLEANING_GROUPS':
             return { ...oldState, cleaningGroups: data };
         case 'ADD_MINISTRY_FIELD_CACHE':
