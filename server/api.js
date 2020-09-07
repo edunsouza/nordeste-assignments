@@ -6,6 +6,7 @@ const { Contacts, CleaningGroups, Cache } = require('./models');
 const {
     getWeekSpan,
     generateRandomStringSized,
+    capitalize,
     getDynamicUrl,
     getWorkbookSkeleton,
     toWorkbookItem,
@@ -136,9 +137,29 @@ module.exports = app => {
         }
     });
 
-    // TODO
     app.post('/contacts', async (req, res) => {
-        res.json({ error: 'not created yet.' });
+        try {
+            const { name, address } = req.body;
+
+            if (!name) {
+                return res.status(400).json({ error: 'Não é possível criar contatos sem nome' });
+            }
+
+            const newContact = {
+                name: capitalize(name),
+                address: address || generateRandomStringSized(10)
+            };
+
+            const duplicates = await Contacts.find({ $or: [{ name: newContact.name }, { address: newContact.address }] });
+            if (!duplicates.length) {
+                await Contacts.create(newContact);
+            }
+
+            res.status(200).json({ message: 'Contato criado!', contact: newContact });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ error: 'Não foi possível adicionar o contato' });
+        }
     });
 
     app.get('/cleaning-groups', async (req, res) => {

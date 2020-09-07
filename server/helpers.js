@@ -25,6 +25,12 @@ const generateRandomStringSized = size => {
         .join('')
 };
 
+const capitalize = text => {
+    if (typeof text === 'string') {
+        return text.toLowerCase().replace(/(?:^|\s|["'([{])+\S/g, match => match.toUpperCase());
+    }
+};
+
 const getProperText = text => {
     text = text || '';
     return text
@@ -163,6 +169,7 @@ const sendEmail = async (to, subject, html) => {
 module.exports = {
     getWeekSpan,
     generateRandomStringSized,
+    capitalize,
     getProperText,
     getDynamicUrl,
     toWorkbookItem,
