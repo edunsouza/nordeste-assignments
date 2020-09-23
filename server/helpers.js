@@ -12,9 +12,15 @@ const generateHash = value => {
 };
 
 const getWeekSpan = () => {
+    const now = moment().locale('pt-br');
+
+    if (shouldJumpToNextWeek()) {
+        now.add(1, 'week');
+    }
+
     return {
-        start: moment().locale('pt-br').startOf('isoWeek').format('DD/MM'),
-        end: moment().locale('pt-br').endOf('isoWeek').format('DD/MM'),
+        start: now.startOf('isoWeek').format('DD/MM'),
+        end: now.endOf('isoWeek').format('DD/MM'),
     };
 };
 
@@ -40,9 +46,14 @@ const getProperText = text => {
         .trim()
 };
 
+const shouldJumpToNextWeek = () => {
+    return ['sex', 'sáb', 'dom'].includes(moment().locale('pt-br').format('ddd').toLowerCase());
+}
+
 const getDynamicUrl = () => {
-    const startOfWeek = moment().locale('pt-br').startOf('isoWeek');
-    const endOfWeek = moment().locale('pt-br').endOf('isoWeek');
+    const today = shouldJumpToNextWeek() ? moment().endOf('isoWeek').add(1, 'day') : moment();
+    const startOfWeek = today.clone().locale('pt-br').startOf('isoWeek');
+    const endOfWeek = today.clone().locale('pt-br').endOf('isoWeek');
     const getMonth = d => d.format('MMMM');
     const getMonthDay = d => d.format('D');
     const isSameMonth = getMonth(startOfWeek) == getMonth(endOfWeek);
