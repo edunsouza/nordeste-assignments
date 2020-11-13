@@ -117,7 +117,13 @@ function App() {
                 [theme.breakpoints.down('xs')]: {
                     padding: theme.spacing(2)
                 }
-            }
+            },
+            root: {
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme.palette.primary.main,
+                    borderWidth: '2px'
+                }
+            },
         },
         MuiSelect: {
             select: {

@@ -6,6 +6,7 @@ const assignmentsInitialState = {
     emailSent: false,
     parts: [],
     contacts: [],
+    contactGroups: [],
     cleaningGroups: [],
     ministryFieldsCache: {},
     preview: {
@@ -31,17 +32,32 @@ const assignmentsReducer = (oldState, { type, data }) => {
         case 'SET_CONTACTS':
             return {
                 ...oldState,
-                contacts: data.sort(({ text: nameA = '' }, { text: nameB = '' }) => nameA.toUpperCase() > nameB.toUpperCase() ? 1 : -1)
+                contacts: (data || []).sort((a, b) => a.text.toUpperCase() > b.text.toUpperCase() ? 1 : -1)
             };
         case 'ADD_CONTACT':
-            const newContact = { text: data.name, value: data.address };
+            const newContact = { id: data.id, text: data.name, value: data.address };
             return {
                 ...oldState,
                 contacts: [
                     ...oldState.contacts,
                     newContact
-                ].sort(({ text: nameA = '' }, { text: nameB = '' }) => nameA.toUpperCase() > nameB.toUpperCase() ? 1 : -1)
+                ].sort((a, b) => a.text.toUpperCase() > b.text.toUpperCase() ? 1 : -1)
             };
+        case 'REMOVE_CONTACT':
+            return { ...oldState, contacts: [...oldState.contacts].filter(c => c.id !== data) };
+        case 'SET_CONTACT_GROUPS':
+            return { ...oldState, contactGroups: data || [] };
+        case 'ADD_CONTACT_GROUP':
+            const newContactGroup = { id: data.id, name: data.name, contacts: data.contacts };
+            return {
+                ...oldState,
+                contactGroups: [
+                    ...oldState.contactGroups,
+                    newContactGroup
+                ].sort((a, b) => a.name.toUpperCase() > b.name.toUpperCase() ? 1 : -1)
+            };
+        case 'REMOVE_CONTACT_GROUP':
+            return { ...oldState, contactGroups: [...oldState.contactGroups].filter(cg => cg.id !== data) };
         case 'SET_CLEANING_GROUPS':
             return { ...oldState, cleaningGroups: data };
         case 'ADD_MINISTRY_FIELD_CACHE':

@@ -13,17 +13,18 @@ import {
     Box
 } from '@material-ui/core';
 
-export default function PopupModal({ isOpen, onClose, title, content, onConfirm, hasInput, inputLabel, confirmOnly = false }) {
+export default function PopupModal({ isOpen, onClose, title, content, onConfirm, hasInput, inputLabel, confirmOnly }) {
     const [text, setText] = useState('');
     const close = () => {
         document.body.style.overflow = 'auto';
         onClose && onClose();
     };
 
-    const confirm = () => {
-        if (hasInput) {
-            onConfirm && onConfirm(text);
-        } else {
+    const confirm = async () => {
+        if (!onConfirm) {
+            close();
+        } else if (await onConfirm(text)) {
+            hasInput && setText('');
             close();
         }
     };

@@ -15,7 +15,6 @@ import { useRootContext } from '../RootContext';
 import ControlledSelect from '../ControlledSelect';
 import PopupModal from '../PopupModal';
 
-
 export default function AssignmentsForm({ form }) {
     const { store, dispatch } = useRootContext().assignments;
     const { parts, contacts, cleaningGroups, ministryFieldsCache } = store;
@@ -31,7 +30,7 @@ export default function AssignmentsForm({ form }) {
         try {
             const { data } = await axios.get(`${process.env.REACT_APP_ROOT}/api/v1/meeting-workbook`);
             dispatch({ type: 'SET_PARTS', data });
-        } catch (e) {
+        } catch {
             openModal({
                 title: 'Erro',
                 content: <Typography>Não foi possível obter as partes automaticamente!</Typography>
@@ -42,14 +41,16 @@ export default function AssignmentsForm({ form }) {
     const fetchContacts = useCallback(async () => {
         try {
             const { data } = await axios.get(`${process.env.REACT_APP_ROOT}/api/v1/contacts`);
-            dispatch({
-                type: 'SET_CONTACTS',
-                data: data.map(c => ({ value: c.address, text: c.name }))
-            });
+            if (Array.isArray(data) && data.length) {
+                dispatch({
+                    type: 'SET_CONTACTS',
+                    data: data.map(c => ({ id: c.id, value: c.address, text: c.name }))
+                });
+            }
         } catch {
             openModal({
                 title: 'Erro',
-                content: <Typography>Não foi possível obter os designados!</Typography>
+                content: <Typography>Não foi possível obter os contatos!</Typography>
             });
         }
     }, [dispatch]);
@@ -98,6 +99,7 @@ export default function AssignmentsForm({ form }) {
                     ? 'Este arranjo já foi informado.'
                     : 'Arranjo de campo não foi informado.'
             });
+            setModalOnConfirm(null);
             return false;
         }
     };

@@ -57,13 +57,20 @@ export default function StepByStep({ steps = [], feedback, conclusionStep, onCon
         spacing: {
             marginLeft: theme.spacing(1),
             marginRight: theme.spacing(1)
+        },
+        stepperCard: {
+            paddingBottom: theme.spacing(4),
+            [theme.breakpoints.down('xs')]: {
+                margin: theme.spacing(1),
+                padding: theme.spacing(1),
+            }
         }
     }))();
 
     return (
         <div>
             <Paper elevation={2}>
-                <Box m={1} mt={3} p={1} pb={5}>
+                <Box className={classes.stepperCard}>
                     <Stepper activeStep={activeStep} alternativeLabel>
                         {
                             steps.length && steps.map((step, index) => (

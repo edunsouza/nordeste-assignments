@@ -8,8 +8,9 @@ import ParticipantsTab from './ParticipantsTab';
 import MetricsTab from './MetricsTab';
 
 function SegmentedContent({ children, value, index }) {
+	const theme = useTheme();
 	return (
-		<Container hidden={value !== index} style={{ minHeight: '250px' }} >
+		<Container hidden={value !== index} style={{ paddingBottom: theme.spacing(2) }} >
 			{value === index && children}
 		</Container>
 	);
@@ -20,11 +21,14 @@ export default function SegmentedHeader() {
 	const theme = useTheme();
 	const styleGrowMarginRight = { flexGrow: 1, marginRight: theme.spacing(2) };
 	const handleChange = (_, newValue) => setValue(newValue);
-	const handleChangeIndex = (index) => setValue(index);
-
+	const handleChangeIndex = (index, _, event) => {
+		if (event.reason === 'swipe') {
+			setValue(index);
+		}
+	}
 	return (
 		<Container disableGutters={true} maxWidth={false}>
-			<AppBar elevation={3} position="static" color="primary">
+			<AppBar elevation={3} position="static" color="primary" style={{ marginBottom: theme.spacing(3) }}>
 				<Toolbar>
 					<Box mb={2} mt={1} flexShrink={1}>
 						<Typography color="secondary" align="center" variant="h6">JW.ORG</Typography>
@@ -40,7 +44,7 @@ export default function SegmentedHeader() {
 					<Tab label="Métricas" />
 				</Tabs>
 			</AppBar>
-			<SwipeableViews axis={theme.direction === 'rtl' ? 'x-reverse' : 'x'} index={value} onChangeIndex={handleChangeIndex}>
+			<SwipeableViews axis="x" index={value} onChangeIndex={handleChangeIndex}>
 				<SegmentedContent value={value} index={0}><AssignmentsTab /></SegmentedContent>
 				<SegmentedContent value={value} index={1}><ParticipantsTab /></SegmentedContent>
 				<SegmentedContent value={value} index={2}><MetricsTab /></SegmentedContent>
