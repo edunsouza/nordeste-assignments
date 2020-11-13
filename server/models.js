@@ -35,9 +35,17 @@ const Cache = new Schema({
     collection: 'cache'
 });
 
+const ContactGroups = new Schema({
+    name: String,
+    contacts: [Schema.Types.ObjectId]
+}, {
+    collection: 'contactGroups'
+});
+
 module.exports = {
     Contacts: db.model('Contacts', Contacts),
     CleaningGroups: db.model('CleaningGroups', CleaningGroups),
     Configs: db.model('Configs', Configs),
     Cache: db.model('Cache', Cache),
+    ContactGroups: db.model('ContactGroups', ContactGroups),
 };

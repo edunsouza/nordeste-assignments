@@ -3,18 +3,27 @@ const moment = require('moment');
 const axios = require('axios');
 const sendGridMail = require('@sendgrid/mail');
 
-// TODO: LOGIN
-const generateHash = value => {
-    return crypto
-        .createHmac('sha256', process.env.HASHING_KEY || 'devmode')
-        .update(String(value))
-        .digest('hex')
+const secret = {
+    algorithm: 'aes-256-ctr',
+    password: process.env.HASHING_KEY || 'devmode'
+};
+
+const encrypt = value => {
+    const cipher = crypto.createCipher(secret.algorithm, secret.password);
+    const encrypted = cipher.update(String(value), 'utf8', 'hex');
+    return encrypted + cipher.final('hex');
+};
+
+const decrypt = value => {
+    const decipher = crypto.createDecipher(secret.algorithm, secret.password);
+    const decrypted = decipher.update(String(value), 'hex', 'utf8');
+    return decrypted + decipher.final('utf8');
 };
 
 const getWeekSpan = () => {
     const now = moment().locale('pt-br');
 
-    if (shouldJumpToNextWeek()) {
+    if (shouldJumpToNextWeek(now)) {
         now.add(1, 'week');
     }
 
@@ -46,22 +55,27 @@ const getProperText = text => {
         .trim()
 };
 
-const shouldJumpToNextWeek = () => {
-    return ['sex', 'sáb', 'dom'].includes(moment().locale('pt-br').format('ddd').toLowerCase());
+const shouldJumpToNextWeek = (today) => {
+    return ['sex', 'sáb', 'dom'].includes(moment(today).locale('pt-br').format('ddd').toLowerCase());
 }
 
-const getDynamicUrl = () => {
-    const today = shouldJumpToNextWeek() ? moment().endOf('isoWeek').add(1, 'day') : moment();
+const getDynamicUrls = () => {
+    const now = moment();
+    const today = shouldJumpToNextWeek(now) ? now.endOf('isoWeek').add(1, 'day') : now;
     const startOfWeek = today.clone().locale('pt-br').startOf('isoWeek');
     const endOfWeek = today.clone().locale('pt-br').endOf('isoWeek');
     const getMonth = d => d.format('MMMM');
-    const getMonthDay = d => d.format('D');
+    const getMonthDay = d => d.format('D') + (d.date() === 1 ? 'º' : '');
     const isSameMonth = getMonth(startOfWeek) == getMonth(endOfWeek);
-    const monthName = getMonth(moment(startOfWeek));
+    const monthName = getMonth(startOfWeek);
     const yearNumber = moment(startOfWeek).startOf('year').format('Y');
     const start = isSameMonth ? getMonthDay(startOfWeek) : [getMonthDay(startOfWeek), 'de', getMonth(startOfWeek)].join('-');
     const end = `${getMonthDay(endOfWeek)}-de-${getMonth(endOfWeek)}`;
-    return encodeURI(`https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/${monthName}-${yearNumber}-mwb/Programa-da-semana-de-${start}-${end}-de-${yearNumber}-na-Apostila-da-Reunião-Vida-e-Ministério/`);
+    const baseUrl = `https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/${monthName}-${yearNumber}-mwb/Programa-da-semana-de-${start}-${end}{0}-na-Apostila-da-Reunião-Vida-e-Ministério/`;
+    return [
+        encodeURI(baseUrl.replace('{0}', `-de-${yearNumber}`)),
+        encodeURI(baseUrl.replace('{0}', ''))
+    ]
 }
 
 const indexOrInfinity = (needle, haystack) => {
@@ -178,11 +192,13 @@ const sendEmail = async (to, subject, html) => {
 };
 
 module.exports = {
+    encrypt,
+    decrypt,
     getWeekSpan,
     generateRandomStringSized,
     capitalize,
     getProperText,
-    getDynamicUrl,
+    getDynamicUrls,
     toWorkbookItem,
     getWorkbookSkeleton,
     sendEmail,

@@ -2,23 +2,20 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const pug = require('pug');
 
-const { Contacts, CleaningGroups, Cache } = require('./models');
+const { Contacts, CleaningGroups, Cache, ContactGroups } = require('./models');
 const {
+    encrypt,
+    decrypt,
     getWeekSpan,
     generateRandomStringSized,
     capitalize,
-    getDynamicUrl,
+    getDynamicUrls,
     getWorkbookSkeleton,
     toWorkbookItem,
     sendEmail,
 } = require('./helpers');
 
 module.exports = app => {
-    // TODO
-    app.get('/assignments', async (req, res) => {
-        res.json({ error: 'not created yet.' });
-    });
-
     app.post('/assignments', async (req, res) => {
         try {
             const { to = [] } = req.body;
@@ -103,12 +100,12 @@ module.exports = app => {
             delete previewCache.isMobile;
 
             // clear other previews (async)
-            Cache.deleteMany({ dayWeekBegins: { $nin: [dayWeekBegins] } });
+            await Cache.deleteMany({ dayWeekBegins: { $nin: [dayWeekBegins] } });
 
             // store or update cache
             const hasCache = await Cache.find({ dayWeekBegins }).catch(e => false);
             if (!hasCache || !hasCache.length) {
-                Cache.create(previewCache);
+                await Cache.create(previewCache);
             } else {
                 const newPreview = hasCache[0];
                 newPreview.weekend = previewCache.weekend;
@@ -127,10 +124,14 @@ module.exports = app => {
         }
     });
 
-    app.get('/contacts', async (req, res) => {
+    app.get('/contacts', async (_, res) => {
         try {
             const contacts = await Contacts.find().lean();
-            res.status(200).json(contacts.map(({ name, address }) => ({ name, address })));
+            res.status(200).json(contacts.map(({ _id, name, address }) => ({
+                id: encrypt(_id),
+                name,
+                address
+            })));
         } catch (error) {
             console.log(error);
             res.status(400).json({ error: 'Não foi possível obter os contatos' });
@@ -145,24 +146,119 @@ module.exports = app => {
                 return res.status(400).json({ error: 'Não é possível criar contatos sem nome' });
             }
 
-            const newContact = {
-                name: capitalize(name),
-                address: address || generateRandomStringSized(10)
-            };
+            const newContact = new Contacts();
+            newContact.name = capitalize(name);
+            newContact.address = address || generateRandomStringSized(10);
 
-            const duplicates = await Contacts.find({ $or: [{ name: newContact.name }, { address: newContact.address }] });
+            const duplicates = await Contacts.find({
+                $or: [
+                    { name: newContact.name },
+                    { address: newContact.address }
+                ]
+            });
+
             if (!duplicates.length) {
-                await Contacts.create(newContact);
+                await newContact.save();
+                const contact = newContact.toJSON();
+                contact.id = encrypt(contact._id);
+                delete contact._id;
+                return res.status(200).json({ message: 'Contato criado!', contact });
             }
 
-            res.status(200).json({ message: 'Contato criado!', contact: newContact });
+            res.status(200).json({ message: 'Contato já existente!' });
         } catch (error) {
             console.log(error);
             res.status(500).json({ error: 'Não foi possível adicionar o contato' });
         }
     });
 
-    app.get('/cleaning-groups', async (req, res) => {
+    app.delete('/contacts/:id', async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            if (!id) {
+                console.log('No contact was found with id: ', id);
+                return res.status(400).json({ error: 'Não foi possível excluir o contato' });
+            }
+
+            const deleted = await Contacts.findByIdAndDelete({ _id: decrypt(id) });
+
+            if (deleted) {
+                console.log('Deleted contact: ', JSON.stringify(deleted.toJSON(), null, 4));
+            }
+
+            res.status(200).json({ message: 'Contato excluído com sucesso!' });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ error: 'Não foi possível excluir o contato' });
+        }
+    });
+
+    app.get('/contact-groups', async (_, res) => {
+        try {
+            let groups = await ContactGroups.find().lean();
+            if (groups.length) {
+                groups = groups.map(({ _id, name, contacts }) => ({
+                    id: encrypt(_id),
+                    name,
+                    contacts
+                }));
+            }
+            return res.status(200).json(groups);
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ error: 'Não foi possível buscar os grupos de contatos' });
+        }
+    });
+
+    app.post('/contact-groups', async (req, res) => {
+        try {
+            const { name, contacts } = req.body;
+
+            if (!name || !Array.isArray(contacts) || !contacts.length) {
+                return res.status(500).json({ error: !name ? 'Nome não informado' : 'Membros do grupo não informados' });
+            }
+
+            const newGroup = new ContactGroups();
+            newGroup.name = name;
+            newGroup.contacts = contacts.map(cid => decrypt(cid));
+            await newGroup.save();
+
+            const group = newGroup.toJSON();
+            group.contacts = group.contacts.map(cid => encrypt(cid));
+            group.id = encrypt(group._id);
+            delete group._id;
+
+            return res.status(200).json(group);
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ error: 'Não foi possível buscar os grupos de contatos' });
+        }
+    });
+
+    app.delete('/contact-groups/:id', async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            if (!id) {
+                console.log('No contact group was found with id: ', id);
+                return res.status(400).json({ error: 'Não foi possível excluir o grupo de contatos' });
+            }
+
+            const deleted = await ContactGroups.findByIdAndDelete({ _id: decrypt(id) });
+
+            if (deleted) {
+                console.log('Deleted contact group: ', JSON.stringify(deleted.toJSON(), null, 4));
+            }
+
+            res.status(200).json({ message: 'Grupo de contatos excluído com sucesso!' });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ error: 'Não foi possível excluir o grupo de contatos' });
+        }
+    });
+
+    app.get('/cleaning-groups', async (_, res) => {
         try {
             const groups = await CleaningGroups.find().lean();
             res.status(200).json(groups.map(({ name, groupId: id }) => ({ name, id })));
@@ -188,22 +284,12 @@ module.exports = app => {
         }
     });
 
-    // TODO
-    app.get('/last-assignments', async (req, res) => {
-        res.json({ error: 'not created yet.' });
-    });
-
-    // TODO
-    app.get('/last-assignments/:contactId', async (req, res) => {
-        res.json({ error: 'not created yet.' });
-    });
-
-    app.get('/meeting-workbook', async (req, res) => {
+    app.get('/meeting-workbook', async (_, res) => {
         try {
-            const { data } = await axios.get(getDynamicUrl());
+            const [workbookUrl, fallback] = getDynamicUrls();
+            const { data } = await axios.get(workbookUrl).catch(async () => await axios.get(fallback));
             const $ = cheerio.load(data);
             let sectionPosition = 1;
-
             const meetingWorkbook = getWorkbookSkeleton().map(section => {
                 section.title = section.getTitle($);
                 section.position = sectionPosition++;
