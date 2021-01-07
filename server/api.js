@@ -18,7 +18,7 @@ const {
 module.exports = app => {
     app.post('/assignments', async (req, res) => {
         try {
-            const { to = [] } = req.body;
+            const { groups = [] } = req.body;
             const { start: dayWeekBegins, end: dayWeekEnds } = getWeekSpan();
             const preview = await Cache.find({ dayWeekBegins }).lean().catch(e => false);
             const subject = `DESIGNAÇÕES DA SEMANA (${dayWeekBegins} - ${dayWeekEnds})`;
@@ -30,10 +30,30 @@ module.exports = app => {
             preview.isMobile = false;
             const html = pug.renderFile(__dirname + '/assignments.pug', preview[0]);
 
-            // send
-            const foundContacts = await Contacts.find({ address: { $in: to.map(t => t.email) } }, { name: 1, address: 1 }).lean();
+            const foundGroups = await ContactGroups.find({
+                _id: {
+                    $in: groups.map(g => decrypt(g))
+                }
+            }).lean();
+
+            const foundContacts = await Contacts.find(
+                {
+                    _id:
+                    {
+                        $in: foundGroups.reduce((list, cg) => {
+                            list = [...list, ...cg.contacts];
+                            return list;
+                        }, [])
+                    }
+                },
+                { name: 1, address: 1 }
+            ).lean();
+
             const emailList = foundContacts.map(({ name, address }) => ({ name, email: address }));
-            const success = await sendEmail(emailList, subject, html);
+
+            const success = process.env.NODE_ENV !== 'PROD'
+                ? true
+                : await sendEmail(emailList, subject, html);
 
             if (!success) {
                 res.status(400).json({ message: 'Não foi possível enviar as designações' });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
     Paper,
@@ -10,6 +10,7 @@ import {
     ListItem,
     List
 } from '@material-ui/core';
+import { makeStyles, useTheme } from '@material-ui/styles';
 
 import { useRootContext } from '../RootContext';
 import FabLoadingProgress from '../FabLoadingProgress';
@@ -17,35 +18,47 @@ import PopupModal from '../PopupModal';
 
 export default function AssignmentsPublication() {
     const { store, dispatch } = useRootContext().assignments;
-    const { contacts } = store;
+    const { contactGroups } = store;
     const [success, setSuccess] = useState(false);
     const [modalMessage, setModalMessage] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [checkboxes, setCheckbox] = useState({});
+    const [loadingGroups, setLoadingGroups] = useState(false);
+    const [checkboxes, setCheckbox] = useState([]);
+
+    const getGroups = useCallback(async () => {
+        try {
+            setLoadingGroups(true);
+            const { data } = await axios.get(`${process.env.REACT_APP_ROOT}/api/v1/contact-groups`);
+            if (Array.isArray(data) && data.length) {
+                dispatch({ type: 'SET_CONTACT_GROUPS', data });
+            }
+            setLoadingGroups(false);
+        } catch (error) {
+            console.error(error);
+            setLoadingGroups(false);
+        }
+    }, [dispatch]);
 
     const send = async () => {
         try {
             setLoading(true);
-            const emailsList = Object.keys(checkboxes).filter(k => checkboxes[k]).map(t => {
-                const foundContact = contacts.find(c => c.value === t);
-                return {
-                    email: foundContact.value,
-                    name: foundContact.text,
-                }
+
+            const { data } = await axios.post(`${process.env.REACT_APP_ROOT}/api/v1/assignments`, {
+                groups: checkboxes
             });
-            const { data } = await axios.post(`${process.env.REACT_APP_ROOT}/api/v1/assignments`, { to: emailsList });
 
             if (data) {
                 setSuccess(true);
                 setLoading(false);
                 dispatch({ type: 'SET_EMAIL_SENT', data: true });
                 setModalMessage(<>
-                    <Typography variant="button" color="primary">Email enviado para:</Typography>
-                    {Object.keys(checkboxes).filter(k => checkboxes[k]).map(contact => (
-                        <Typography variant="body1" key={contact}>
-                            {contact}
-                        </Typography>
-                    ))}
+                    <Typography variant="button" color="primary">Email enviado para o(s) grupo(s):</Typography>
+                    {checkboxes.map(groupdId => {
+                        const { id, name } = contactGroups.find(cg => cg.id === groupdId) || {};
+                        return (
+                            <Typography variant="body1" key={id}>{name}</Typography>
+                        )
+                    })}
                 </>);
             }
         } catch (error) {
@@ -54,6 +67,35 @@ export default function AssignmentsPublication() {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (!contactGroups || !contactGroups.length) {
+            getGroups();
+        }
+    }, [contactGroups, getGroups]);
+
+    const theme = useTheme();
+    const classes = makeStyles({
+        groupsBox: {
+            margin: theme.spacing(1),
+            marginTop: theme.spacing(3),
+            padding: theme.spacing(1),
+            paddingBottom: theme.spacing(5),
+            paddingTop: theme.spacing(5),
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            flexDirection: 'column',
+        },
+        checkboxLabel: {
+            '& .MuiTypography-root': {
+                [theme.breakpoints.down('sm')]: {
+                    'maxWidth': '200px',
+                    'wordBreak': 'break-word',
+                }
+            }
+        }
+    })();
 
     return (
         <Paper elevation={2}>
@@ -65,16 +107,21 @@ export default function AssignmentsPublication() {
                 onConfirm={() => setModalMessage(false)}
             />
 
-            <Box m={1} mt={3} p={1} pb={5} display="flex" justifyContent="center" alignItems="center" flexDirection="column">
-                <Typography variant="subtitle1">Selecione os contatos que deseja incluir no email:</Typography>
+            <Box className={classes.groupsBox}>
+                <Typography color="primary" variant="h6">Selecione o grupo de contatos para enviar o email:</Typography>
                 <List>
-                    {contacts && contacts.map(({ text: name, value: address }, index) => (
-                        <ListItem key={`${address}-${index}`} dense>
+                    {!loadingGroups && contactGroups.length > 0 && contactGroups.map(({ id, name, contacts }, index) => (
+                        <ListItem key={`${id}-${index}`} dense>
                             <ListItemIcon>
                                 <FormControlLabel
-                                    control={<Checkbox color="primary" name={address} />}
-                                    label={`${name} (${address})`}
-                                    onChange={e => setCheckbox({ ...checkboxes, [address]: e.target.checked })}
+                                    className={classes.checkboxLabel}
+                                    control={<Checkbox color="primary" name={id} />}
+                                    label={`${name} (${contacts.length} membros)`}
+                                    onChange={e => {
+                                        if (e.target.checked) {
+                                            setCheckbox([...checkboxes, id]);
+                                        }
+                                    }}
                                 />
                             </ListItemIcon>
                         </ListItem>
