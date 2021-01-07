@@ -5,11 +5,8 @@
   "main": "../server.js",
   "scripts": {
     "test": "echo 1",
-    "start": "node ../server.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/edunsouza/nordeste-assignments.git"
+    "start": "node ../server.js",
+    "watch": "nodemon ../server.js"
   },
   "keywords": [
     "nordeste",
