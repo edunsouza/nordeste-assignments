@@ -2,6 +2,7 @@ const { execSync } = require('child_process');
 const path = require('path');
 
 const targetPath = process.argv[2] || '../nordeste';
+const install = process.argv.includes('-i');
 const thisFile = path.basename(process.argv[1]);
 
 const cmd = command => execSync(command, { encoding: 'utf-8' });
@@ -26,8 +27,10 @@ const absoluteTarget = cmd(`(cd ${targetPath}; pwd)`).replace(/\n/g, '');
 const serverFolder = path.join(absoluteTarget, 'server');
 const clientFolder = path.join(absoluteTarget, 'client');
 
-cmd(`npm --prefix ${serverFolder} install`);
-cmd(`npm --prefix ${clientFolder} install`);
+if (install) {
+    cmd(`npm --prefix ${serverFolder} install`);
+    cmd(`npm --prefix ${clientFolder} install`);
+}
 cmd(`npm --prefix ${clientFolder} run build`);
 cmd(`(cd ${absoluteTarget}; git add .)`);
 cmd(`(cd ${absoluteTarget}; git commit -m "deployed by script @ ${new Date().toLocaleString('pt-BR')}")`);
