@@ -332,7 +332,7 @@ module.exports = app => {
 
             res.status(200).json(meetingWorkbook);
         } catch (error) {
-            console.error(error);
+            console.error(Object.keys(error));
             res.status(500).json({ error: 'Apostila não encontrada!' });
         }
     });

@@ -68,13 +68,16 @@ const getDynamicUrls = () => {
     const getMonthDay = d => d.format('D') + (d.date() === 1 ? 'º' : '');
     const isSameMonth = getMonth(startOfWeek) == getMonth(endOfWeek);
     const monthName = getMonth(startOfWeek);
+    const nextMonthName = getMonth(startOfWeek.add(1, 'month'));
     const yearNumber = moment(startOfWeek).startOf('year').format('Y');
     const start = isSameMonth ? getMonthDay(startOfWeek) : [getMonthDay(startOfWeek), 'de', getMonth(startOfWeek)].join('-');
     const end = `${getMonthDay(endOfWeek)}-de-${getMonth(endOfWeek)}`;
-    const baseUrl = `https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/${monthName}-${yearNumber}-mwb/Programa-da-semana-de-${start}-${end}{0}-na-Apostila-da-Reunião-Vida-e-Ministério/`;
+    const baseUrl = `https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/${monthName}-${nextMonthName}-${yearNumber}-mwb/Programação-da-semana-de-${start}{0}-${end}{1}-na-Apostila-da-Reunião-Vida-e-Ministério/`;
+
     return [
-        encodeURI(baseUrl.replace('{0}', `-de-${yearNumber}`)),
-        encodeURI(baseUrl.replace('{0}', ''))
+        encodeURI(baseUrl.replace('{0}', '').replace('{1}', `-de-${yearNumber}`)),
+        encodeURI(baseUrl.replace('{0}', `-de-${yearNumber}`).replace('{1}', `-de-${parseInt(yearNumber, 10) + 1}`)),
+        encodeURI(baseUrl.replace(/\{[01]\}/g, ''))
     ]
 }
 
@@ -118,33 +121,33 @@ const getWorkbookSkeleton = () => [
         id: 'treasures',
         color: '#ffffff',
         tone: '#606a70',
-        getTitle: doc => doc('#section2 .shadedHeader').text(),
+        getTitle: doc => doc('#section2 .mwbHeadingIcon').text(),
         isAssignable: () => true,
         chairmanAssigned: () => false,
         items: [],
-        itemsSelector: '.treasures + .pGroup > ul > li',
+        itemsSelector: '*[class*=treasures] + .pGroup > ul > li',
         itemsTone: '#606a70',
     },
     {
         id: 'ministry',
         color: '#ffffff',
         tone: '#c18626',
-        getTitle: doc => doc('#section3 .shadedHeader').text(),
+        getTitle: doc => doc('#section3 .mwbHeadingIcon').text(),
         isAssignable: () => true,
         chairmanAssigned: part => !part.match(/\(melhore lição/gi),
         items: [],
-        itemsSelector: '.ministry + .pGroup > ul > li',
+        itemsSelector: '*[class*=ministry] + .pGroup > ul > li',
         itemsTone: '#c18626',
     },
     {
         id: 'living',
         color: '#ffffff',
         tone: '#961526',
-        getTitle: doc => doc('#section4 .shadedHeader').text(),
+        getTitle: doc => doc('#section4 .mwbHeadingIcon').text(),
         isAssignable: part => Boolean(!part.match(/cântico/gi) || (part.match(/oração/gi))),
         chairmanAssigned: part => Boolean(part.match(/comentários finais/gi)),
         items: [],
-        itemsSelector: '.christianLiving + .pGroup > ul > li',
+        itemsSelector: '*[class*=christianLiving] + .pGroup > ul > li',
         itemsTone: '#961526',
     },
 ];

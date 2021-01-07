@@ -8,7 +8,7 @@ import AssignmentsForm from './AssignmentsForm';
 import AssignmentsPreview from './AssignmentsPreview';
 import AssignmentsPublication from './AssignmentsPublication';
 
-import { submitReactFormHook, scrollToElement } from '../../common/utils';
+import { submitReactFormHook } from '../../common/utils';
 
 import StepByStep from '../StepByStep';
 
@@ -64,7 +64,7 @@ export default function AssignmentsTab() {
                 variant="extended"
                 color="primary"
                 className={classes.goTopFab}
-                onClick={() => scrollToElement(pageTop.current, 'start')}
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             >
                 <NavigationIcon /> Topo
             </Fab>}
