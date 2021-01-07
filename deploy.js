@@ -26,8 +26,9 @@ const absoluteTarget = cmd(`(cd ${targetPath}; pwd)`).replace(/\n/g, '');
 const serverFolder = path.join(absoluteTarget, 'server');
 const clientFolder = path.join(absoluteTarget, 'client');
 
-cmd('nvm use 8');
-// cmd(`npm --prefix ${serverFolder} install`);
-// cmd(`npm --prefix ${clientFolder} install`);
-// cmd(`npm --prefix ${clientFolder} run build`);
-// cmd(`(cd ${absoluteTarget}; git add .)`);
+cmd(`npm --prefix ${serverFolder} install`);
+cmd(`npm --prefix ${clientFolder} install`);
+cmd(`npm --prefix ${clientFolder} run build`);
+cmd(`(cd ${absoluteTarget}; git add .)`);
+cmd(`(cd ${absoluteTarget}; git commit -m "deployed by script @ ${new Date().toLocaleString('pt-BR')}")`);
+cmd(`(cd ${absoluteTarget}; git push)`);
