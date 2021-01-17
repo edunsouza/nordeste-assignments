@@ -5,22 +5,21 @@ const db = connection.useDb('nordeste');
 const Contacts = new Schema({
     name: String,
     address: String
-}, {
-    collection: 'contacts'
+});
+
+const ContactGroups = new Schema({
+    name: String,
+    contacts: [Schema.Types.ObjectId]
 });
 
 const CleaningGroups = new Schema({
     groupId: String,
     name: String,
-}, {
-    collection: 'cleaningGroups'
 });
 
 const Configs = new Schema({
     key: String,
     value: String
-}, {
-    collection: 'configs'
 });
 
 const Cache = new Schema({
@@ -31,21 +30,19 @@ const Cache = new Schema({
     ministry: Schema.Types.Mixed,
     cleaning: Schema.Types.Mixed,
     week: Schema.Types.Mixed,
-}, {
-    collection: 'cache'
 });
 
-const ContactGroups = new Schema({
+const Metrics = new Schema({
     name: String,
-    contacts: [Schema.Types.ObjectId]
-}, {
-    collection: 'contactGroups'
+    value: Schema.Types.Mixed,
+    reference: { type: Date, default: Date.now }
 });
 
 module.exports = {
-    Contacts: db.model('Contacts', Contacts),
-    CleaningGroups: db.model('CleaningGroups', CleaningGroups),
-    Configs: db.model('Configs', Configs),
-    Cache: db.model('Cache', Cache),
-    ContactGroups: db.model('ContactGroups', ContactGroups),
+    Contacts: db.model('Contacts', Contacts, 'contacts'),
+    ContactGroups: db.model('ContactGroups', ContactGroups, 'contactGroups'),
+    CleaningGroups: db.model('CleaningGroups', CleaningGroups, 'cleaningGroups'),
+    Configs: db.model('Configs', Configs, 'configs'),
+    Cache: db.model('Cache', Cache, 'cache'),
+    Metrics: db.model('Metrics', Metrics, 'metrics'),
 };

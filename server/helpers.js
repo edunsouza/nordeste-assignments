@@ -20,30 +20,16 @@ const decrypt = value => {
     return decrypted + decipher.final('utf8');
 };
 
-const getWeekSpan = () => {
-    const now = moment().locale('pt-br');
-
-    if (shouldJumpToNextWeek(now)) {
-        now.add(1, 'week');
-    }
-
-    return {
-        start: now.startOf('isoWeek').format('DD/MM'),
-        end: now.endOf('isoWeek').format('DD/MM'),
-    };
-};
-
-const generateRandomStringSized = size => {
-    return Array(size > 0 && size < 100 ? size : 10)
-        .fill()
-        .map(() => '0ABC1DEF2GHI3JKL4MNO5PQR6STU7VWX8YZ9'[Math.round(Math.random() * 35)])
-        .join('')
+const random = (size = 10) => {
+    return [...Array(Math.ceil(size / 10))]
+        .reduce(r => r += Math.random().toString(36).substring(2, 12), '')
+        .substring(0, size);
 };
 
 const capitalize = text => {
-    if (typeof text === 'string') {
-        return text.toLowerCase().replace(/(?:^|\s|["'([{])+\S/g, match => match.toUpperCase());
-    }
+    return String(text)
+        .toLowerCase()
+        .replace(/(\b|^)[a-z]/g, match => match.toUpperCase())
 };
 
 const getProperText = text => {
@@ -55,53 +41,61 @@ const getProperText = text => {
         .trim()
 };
 
-const shouldJumpToNextWeek = (today) => {
-    return ['sex', 'sáb', 'dom'].includes(moment(today).locale('pt-br').format('ddd').toLowerCase());
-}
-
 const getDynamicUrls = () => {
-    const now = moment();
-    const today = shouldJumpToNextWeek(now) ? now.endOf('isoWeek').add(1, 'day') : now;
-    const startOfWeek = today.clone().locale('pt-br').startOf('isoWeek');
-    const endOfWeek = today.clone().locale('pt-br').endOf('isoWeek');
     const getMonth = d => d.format('MMMM');
-    const getMonthDay = d => d.format('D') + (d.date() === 1 ? 'º' : '');
-    const isSameMonth = getMonth(startOfWeek) == getMonth(endOfWeek);
-    const monthName = getMonth(startOfWeek);
-    const nextMonthName = getMonth(startOfWeek.add(1, 'month'));
-    const yearNumber = moment(startOfWeek).startOf('year').format('Y');
-    const start = isSameMonth ? getMonthDay(startOfWeek) : [getMonthDay(startOfWeek), 'de', getMonth(startOfWeek)].join('-');
-    const end = `${getMonthDay(endOfWeek)}-de-${getMonth(endOfWeek)}`;
-    const baseUrl = `https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/${monthName}-${nextMonthName}-${yearNumber}-mwb/Programação-da-semana-de-${start}{0}-${end}{1}-na-Apostila-da-Reunião-Vida-e-Ministério/`;
+    const getDay = d => d.format('D') + (d.date() === 1 ? 'º' : '');
+
+    const today = moment().add(shouldJumpToNextWeek() ? 1 : 0, 'week').locale('pt-br');
+    const startOfWeek = moment(today).startOf('isoWeek');
+    const endOfWeek = moment(today).endOf('isoWeek');
+    const currentYear = moment(startOfWeek).startOf('year').format('Y');
+
+    const TEMPLATE_URL = 'https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/'
+        + '{M}-{M++}-{Y}-mwb/'
+        + 'Programação-da-semana-de-{FROM}{0}-{TO}{1}-na-Apostila-da-Reunião-Vida-e-Ministério/';
+
+    const endpoint = TEMPLATE_URL
+        .replace('{M}', getMonth(startOfWeek))
+        .replace('{M++}', getMonth(startOfWeek.clone().add(1, 'month')))
+        .replace('{Y}', currentYear)
+        .replace('{TO}', `${getDay(endOfWeek)}-de-${getMonth(endOfWeek)}`)
+        .replace('{FROM}', getMonth(startOfWeek) == getMonth(endOfWeek)
+            ? getDay(startOfWeek)
+            : [getDay(startOfWeek), 'de', getMonth(startOfWeek)].join('-')
+        );
 
     return [
-        encodeURI(baseUrl.replace('{0}', '').replace('{1}', `-de-${yearNumber}`)),
-        encodeURI(baseUrl.replace('{0}', `-de-${yearNumber}`).replace('{1}', `-de-${parseInt(yearNumber, 10) + 1}`)),
-        encodeURI(baseUrl.replace(/\{[01]\}/g, ''))
+        encodeURI(endpoint.replace('{0}', '').replace('{1}', `-de-${currentYear}`)),
+        encodeURI(endpoint.replace('{0}', `-de-${currentYear}`).replace('{1}', `-de-${parseInt(currentYear, 10) + 1}`)),
+        encodeURI(endpoint.replace(/\{[01]\}/g, ''))
     ]
 }
 
-const indexOrInfinity = (needle, haystack) => {
-    const idx = String(haystack).indexOf(String(needle));
-    return ~idx ? idx : Infinity;
+const toWorkbookItem = scraped => {
+    const spruce = String(scraped).replace(/[:"'”“]|\s+/g, m => `"'”“`.split('').includes(m) ? '"' : ' ').trim();
+    const squeezed = getProperText(spruce);
+
+    const id = squeezed.match(/[^\(]+\(|[^\(]+/).pop().replace(/[)(\s\?]/g, '').toLowerCase();
+    const text = spruce.match(/[^\)]+\)|[^\)]+/).pop();
+    const hasPair = Boolean(!squeezed.match(/(discurso|leitura da biblia) \(/gi) && squeezed.match(/\(melhore licao|estudo biblico de congregacao/gi));
+
+    return { text, hasPair, id };
 };
 
-const toWorkbookItem = fullText => {
-    fullText = (fullText || '').replace(/[:"']/g, '');
-    const cleanText = getProperText(fullText);
-    const should = /(\(melhore licao)|(estudo biblico de congregacao)/ig;
-    const shouldNot = /(discurso \()|(leitura da biblia \()/ig;
+const shouldJumpToNextWeek = () => {
+    return ['sex', 'sáb', 'dom'].includes(moment().locale('pt-br').format('ddd').toLowerCase());
+}
+
+const getWeekSpan = () => {
+    const now = moment().locale('pt-br');
+
+    if (shouldJumpToNextWeek()) {
+        now.add(1, 'week');
+    }
+
     return {
-        text: fullText
-            .substring(0, indexOrInfinity(')', fullText) + 1)
-            .replace(/[”“]/g, '"'),
-        hasPair: Boolean(cleanText.match(should) && !cleanText.match(shouldNot)),
-        id: getProperText(
-            fullText
-                .substring(0, indexOrInfinity('(', fullText) - 1)
-                .replace(/[”“"':?]+/gi, '')
-                .replace(/\s+/gi, '_')
-        )
+        dayWeekBegins: now.startOf('isoWeek').format('DD/MM'),
+        dayWeekEnds: now.endOf('isoWeek').format('DD/MM')
     };
 };
 
@@ -149,7 +143,7 @@ const getWorkbookSkeleton = () => [
         items: [],
         itemsSelector: '*[class*=christianLiving] + .pGroup > ul > li',
         itemsTone: '#961526',
-    },
+    }
 ];
 
 /**
@@ -159,7 +153,10 @@ const getWorkbookSkeleton = () => [
  * }]
 */
 const sendEmail = async (to, subject, html) => {
-    const headers = { "api_key": process.env.PEPIPOST_API_KEY, "content-type": "application/json" };
+    const headers = {
+        'api_key': process.env.PEPIPOST_API_KEY,
+        'content-type': 'application/json'
+    };
     const fromName = 'Nordeste Designações';
     const body = {
         from: { email: process.env.PEPIPOST_FROM_EMAIL, name: fromName },
@@ -198,11 +195,11 @@ module.exports = {
     encrypt,
     decrypt,
     getWeekSpan,
-    generateRandomStringSized,
+    random,
     capitalize,
     getProperText,
     getDynamicUrls,
     toWorkbookItem,
     getWorkbookSkeleton,
-    sendEmail,
+    sendEmail
 };

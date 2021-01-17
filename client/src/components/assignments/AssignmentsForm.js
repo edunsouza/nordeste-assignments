@@ -366,8 +366,8 @@ export default function AssignmentsForm({ form }) {
                         </li>
                     </ul>
 
-                    {parts.map(({ id: sectionId, color, tone: backgroundColor, items, itemsTone, title }) =>
-                        <Box key={`header-item-${sectionId}-${String(Math.ceil(Math.random()))}`}>
+                    {parts.map(({ id: sectionId, color, tone: backgroundColor, items, itemsTone, title }, index) =>
+                        <Box key={`header-item-${sectionId}-${index}`}>
                             <Box className={classes.sectionTitle} style={{ color, backgroundColor }}>
                                 <Typography variant="button">{title}</Typography>
                             </Box>

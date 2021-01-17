@@ -87,8 +87,8 @@ export default function ParticipantsTab() {
 
             try {
                 const { data } = await axios.post(`${process.env.REACT_APP_ROOT}/api/v1/contacts`, contact);
-                if (data && data.contact) {
-                    dispatch({ type: 'ADD_CONTACT', data: data.contact });
+                if (data) {
+                    dispatch({ type: 'ADD_CONTACT', data });
                 }
                 setModalTitle('Sucesso');
                 setModalContent("Contato adicionado com sucesso!");
@@ -97,10 +97,9 @@ export default function ParticipantsTab() {
                 setContactAddress('');
                 setValue(addContactFieldId, '');
             } catch (error) {
-                console.error(error);
                 setModalTitle('Erro');
                 setModalOpen(true);
-                setModalContent(error.error || 'Erro ao adicionar contato');
+                setModalContent(error.message || 'Erro ao adicionar contato');
             }
         }
     };
@@ -119,6 +118,7 @@ export default function ParticipantsTab() {
                 name: newContactGroupName,
                 contacts: newContactGroup
             });
+
             dispatch({ type: 'ADD_CONTACT_GROUP', data });
             setModalTitle('Criar grupo');
             setModalContent((<Typography>Grupo <b>{newContactGroupName}</b> criado com sucesso!</Typography>));
@@ -126,7 +126,7 @@ export default function ParticipantsTab() {
             setModalOpen(true);
         } catch (error) {
             setModalTitle('Erro');
-            setModalContent(error.isAxiosError && error.response.data.error ? error.response.data.error : 'Erro ao criar grupo');
+            setModalContent(error.message || 'Erro ao criar grupo');
             setModalOnConfirm(null);
             setModalOpen(true);
         }
