@@ -73,7 +73,7 @@ const getDynamicUrls = () => {
 
 const toWorkbookItem = scraped => {
     const spruce = String(scraped).replace(/[:"'”“]|\s+/g, m => `"'”“`.split('').includes(m) ? '"' : ' ').trim();
-    const squeezed = getProperText(spruce);
+    const squeezed = getProperText(spruce).replace(/\s+/g, ' ');
 
     const id = squeezed.match(/[^\(]+\(|[^\(]+/).pop().replace(/[)(\s\?]/g, '').toLowerCase();
     const text = spruce.match(/[^\)]+\)|[^\)]+/).pop();
