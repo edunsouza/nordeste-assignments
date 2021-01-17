@@ -162,10 +162,11 @@ export default function AssignmentsForm({ form }) {
 
     useEffect(() => { !parts.length && fetchParts() }, [parts, fetchParts]);
     useEffect(() => { !contacts.length && fetchContacts() }, [contacts, fetchContacts]);
-    useEffect(
-        () => { !cleaningGroups.length && selectedCongregation === mainCongregation && fetchCleaningGroups() },
-        [cleaningGroups, selectedCongregation, fetchCleaningGroups]
-    );
+    useEffect(() => {
+        if (!cleaningGroups.length && selectedCongregation === mainCongregation) {
+            fetchCleaningGroups();
+        }
+    }, [cleaningGroups, selectedCongregation, fetchCleaningGroups]);
 
     const theme = useTheme();
     const classes = makeStyles({
@@ -280,6 +281,11 @@ export default function AssignmentsForm({ form }) {
             margin: 'auto 0 auto auto',
             [theme.breakpoints.down('xs')]: {
                 margin: '0 auto'
+            }
+        },
+        chairmanSelect: {
+            '& svg': {
+                display: 'none'
             }
         }
     })();
@@ -398,7 +404,7 @@ export default function AssignmentsForm({ form }) {
                                                 form={form}
                                                 cache={{ 'chairman_autoassign': { ...(week.chairman || { value: 'unset' }) } }}
                                                 options={[...contacts, { text: 'Feita pelo presidente', value: 'unset' }]}
-                                                classes={clsx(classes.spaceBellow, classes.hoverPrimary, classes.borderPrimary)}
+                                                classes={clsx(classes.spaceBellow, classes.hoverPrimary, classes.borderPrimary, classes.chairmanSelect)}
                                                 disabled={true}
                                             />
                                         }
