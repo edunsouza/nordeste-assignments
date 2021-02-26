@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const moment = require('moment');
+const moment = require('moment-timezone');
 const axios = require('axios');
 const sendGridMail = require('@sendgrid/mail');
 
@@ -41,35 +41,49 @@ const getProperText = text => {
         .trim()
 };
 
+const getUrlMonthRange = currentMonth => {
+    return {
+        1: ['janeiro', 'fevereiro'],
+        2: ['janeiro', 'fevereiro'],
+        3: ['marco', 'abril'],
+        4: ['marco', 'abril'],
+        5: ['maio', 'junho'],
+        6: ['maio', 'junho'],
+        7: ['julho', 'agosto'],
+        8: ['julho', 'agosto'],
+        9: ['setembro', 'outubro'],
+        10: ['setembro', 'outubro'],
+        11: ['novembro', 'dezembro'],
+        12: ['novembro', 'dezembro'],
+    }[currentMonth];
+};
+
 const getDynamicUrls = () => {
-    const getMonth = d => d.format('MMMM');
-    const getDay = d => d.format('D') + (d.date() === 1 ? 'º' : '');
+    const today = moment.tz('America/Sao_Paulo').add(shouldJumpToNextWeek() ? 1 : 0, 'week').locale('pt-br');
+    const weekStart = today.clone().startOf('isoWeek');
+    const weekEnd = today.clone().endOf('isoWeek');
+    const currentYear = weekStart.clone().startOf('year').format('Y');
 
-    const today = moment().add(shouldJumpToNextWeek() ? 1 : 0, 'week').locale('pt-br');
-    const startOfWeek = moment(today).startOf('isoWeek');
-    const endOfWeek = moment(today).endOf('isoWeek');
-    const currentYear = moment(startOfWeek).startOf('year').format('Y');
+    const dayWeekStarts = weekStart.format('D');
+    const startingMonth = weekStart.format('MMMM');
+    const endingMonth = weekEnd.format('MMMM');
+    const currentMonthInterval = getUrlMonthRange(weekStart.format('M'));
 
-    const TEMPLATE_URL = 'https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/'
-        + '{M}-{M++}-{Y}-mwb/'
-        + 'Programação-da-semana-de-{FROM}{0}-{TO}{1}-na-Apostila-da-Reunião-Vida-e-Ministério/';
+    const TEMPLATE_URL = '{M}-{M++}-{Y}-mwb/Programação-da-semana-de-{FROM}{0}-{TO}{1}-na-Apostila-da-Reunião-Vida-e-Ministério';
 
-    const endpoint = TEMPLATE_URL
-        .replace('{M}', getMonth(startOfWeek))
-        .replace('{M++}', getMonth(startOfWeek.clone().add(1, 'month')))
+    const endpoint = 'https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/' + TEMPLATE_URL
+        .replace('{M}', currentMonthInterval[0])
+        .replace('{M++}', currentMonthInterval[1])
         .replace('{Y}', currentYear)
-        .replace('{TO}', `${getDay(endOfWeek)}-de-${getMonth(endOfWeek)}`)
-        .replace('{FROM}', getMonth(startOfWeek) == getMonth(endOfWeek)
-            ? getDay(startOfWeek)
-            : [getDay(startOfWeek), 'de', getMonth(startOfWeek)].join('-')
-        );
+        .replace('{TO}', `${weekEnd.format('D')}-de-${endingMonth}`)
+        .replace('{FROM}', startingMonth === endingMonth ? dayWeekStarts : [dayWeekStarts, 'de', startingMonth].join('-'));
 
     return [
         encodeURI(endpoint.replace('{0}', '').replace('{1}', `-de-${currentYear}`)),
         encodeURI(endpoint.replace('{0}', `-de-${currentYear}`).replace('{1}', `-de-${parseInt(currentYear, 10) + 1}`)),
         encodeURI(endpoint.replace(/\{[01]\}/g, ''))
     ]
-}
+};
 
 const toWorkbookItem = scraped => {
     const spruce = String(scraped).replace(/[:"'”“]|\s+/g, m => `"'”“`.split('').includes(m) ? '"' : ' ').trim();
@@ -83,11 +97,11 @@ const toWorkbookItem = scraped => {
 };
 
 const shouldJumpToNextWeek = () => {
-    return ['sex', 'sáb', 'dom'].includes(moment().locale('pt-br').format('ddd').toLowerCase());
-}
+    return ['sex', 'sáb', 'dom'].includes(moment.tz('America/Sao_Paulo').locale('pt-br').format('ddd').toLowerCase());
+};
 
 const getWeekSpan = () => {
-    const now = moment().locale('pt-br');
+    const now = moment.tz('America/Sao_Paulo').locale('pt-br');
 
     if (shouldJumpToNextWeek()) {
         now.add(1, 'week');
