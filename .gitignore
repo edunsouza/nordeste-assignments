@@ -4,7 +4,9 @@ server/node_modules/
 server/package-lock.json
 server/npm-debug.log*
 
-serverless/poller/.deta/state
+serverless/poller/.deta/
+serverless/poller/node_modules/
+serverless/poller/*.log
 
 client/node_modules/
 client/package-lock.json

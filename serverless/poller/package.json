@@ -1,0 +1,19 @@
+{
+  "name": "poller",
+  "version": "1.0.0",
+  "description": "poller for designator",
+  "main": "index.js",
+  "scripts": {
+    "test": "\"echo 0\""
+  },
+  "keywords": [
+    "poller"
+  ],
+  "author": "Eduardo Nascimento Souza",
+  "license": "ISC",
+  "devDependencies": {},
+  "dependencies": {
+    "axios": "^0.21.1",
+    "express": "^4.17.1"
+  }
+}
