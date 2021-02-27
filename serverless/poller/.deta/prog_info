@@ -1,0 +1,13 @@
+{
+    "space": 1397,
+    "runtime": "nodejs12.x",
+    "name": "poller",
+    "path": "tl8ypr",
+    "region": "sa-east-1",
+    "deps": null,
+    "envs": null,
+    "public": true,
+    "log_level": "debug",
+    "cron": "",
+    "reload_deps": false
+}
