@@ -169,7 +169,7 @@ const getWorkbookSkeleton = () => [
 const sendEmail = async (to, subject, html) => {
     const headers = {
         'api_key': process.env.PEPIPOST_API_KEY,
-        'content-type': 'application/json'
+        'Content-Type': 'application/json;charset=UTF-8'
     };
     const fromName = 'Nordeste Designações';
     const body = {
@@ -203,6 +203,24 @@ const sendEmail = async (to, subject, html) => {
 
     console.log('<EMAIL NOTIFICATION>: [EMAIL SENT] - payload:', firstAttemptData);
     return { success: firstAttemptData };
+};
+
+/**
+ * @to format: [{
+ *      email: 'name@email.com',
+ *      name: 'Name Example'
+ * }]
+*/
+const sendGmail = async (to, subject, html) => {
+    // `
+    //     From: Me <${process.env.GMAIL_FROM_EMAIL}> 
+    //     To: You <email@gmail.com> 
+    //     Subject: test
+    //     Date: ${new Date().toGMTString()}
+    //     Message-ID: ${Math.random().toString(36).substring(2)}
+
+    //     ${html}
+    // `
 };
 
 module.exports = {
