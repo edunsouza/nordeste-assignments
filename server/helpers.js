@@ -11,12 +11,20 @@ function toTimezoneAndLocale(date) {
     return moment(date || undefined).tz('America/Sao_Paulo').locale('pt-br');
 }
 
+function adjustWeek(date) {
+    // too late to send assignments if today is Friday, Saturday or Sunday
+    if (['sex', 'sáb', 'dom'].includes(date.format('ddd'))) {
+        return date.add(1, 'week');
+    }
+
+    return date;
+}
+
 function getWorkbookEndpoints(skippable, date) {
     date = toTimezoneAndLocale(date);
 
-    if (skippable && ['sex', 'sáb', 'dom'].includes(date.format('ddd'))) {
-        // jump to next week if today is Friday, Saturday or Sunday
-        date.add(1, 'week');
+    if (skippable) {
+        date = adjustWeek(date);
     }
 
     const week0 = date.clone().startOf('isoWeek');
@@ -47,12 +55,17 @@ function getWorkbookEndpoints(skippable, date) {
     ];
 }
 
-function getWeekSpan(withYear = false, date = null) {
-    const now = toTimezoneAndLocale(date);
+function getWeekSpan({ withYear = false, date = null, skippable = false }) {
+    date = toTimezoneAndLocale(date);
+
+    if (skippable) {
+        date = adjustWeek(date);
+    }
+
     const format = withYear ? 'DD/MM/YYYY' : 'DD/MM';
     return {
-        dayWeekBegins: now.startOf('isoWeek').format(format),
-        dayWeekEnds: now.endOf('isoWeek').format(format)
+        dayWeekBegins: date.startOf('isoWeek').format(format),
+        dayWeekEnds: date.endOf('isoWeek').format(format)
     };
 }
 

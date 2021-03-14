@@ -8,27 +8,28 @@ const { getWeekSpan, scrapeWorkbook, sendEmail, sendGmail, getGoogleAuth, getSes
 
 const findOrScrape = async (skippable, date) => {
     try {
-        const { dayWeekBegins, dayWeekEnds } = getWeekSpan(true, date);
+        const { dayWeekBegins, dayWeekEnds } = getWeekSpan({ withYear: true, date, skippable });
         const week = `${dayWeekBegins}-${dayWeekEnds}`;
         const success = true;
 
         let workbook = await Workbook.findOne({ week }, { _id: 0, __v: 0 }).lean();
 
         if (workbook) {
+            console.log(`workbook found for week ${week}`);
             return { success, workbook };
         }
 
         const sections = await scrapeWorkbook({ skippable, date });
 
         if (!sections) {
-            return {
-                success: false,
-                error: `workbook not found for week ${week}`
-            };
+            const error = `workbook NOT found for week ${week}`;
+            console.log(error);
+            return { success: false, error };
         }
 
         const wb = new Workbook({ week, sections });
         await wb.save();
+        console.log(`new workbook scraped and stored for week ${week}`);
 
         workbook = wb.toJSON();
         delete workbook._id;
@@ -58,9 +59,9 @@ module.exports = router => {
         }
     });
 
-    router.get('/workbook', async (req, res) => {
+    router.get('/workbook', async (_, res) => {
         try {
-            const { success, workbook, error } = await findOrScrape(true, req.params.date);
+            const { success, workbook, error } = await findOrScrape(true);
             if (success) {
                 res.status(200).json(workbook.sections);
             } else {
@@ -88,7 +89,8 @@ module.exports = router => {
             const contactsIn = { $in: groupList.reduce((list, { contacts }) => [...list, ...contacts], []) };
             const contactList = await Contacts.find({ _id: contactsIn }, { name: 1, address: 1 }).lean();
 
-            const { dayWeekBegins, dayWeekEnds } = getWeekSpan();
+            const { dayWeekBegins, dayWeekEnds } = getWeekSpan({ skippable: true });
+
             const templatePath = path.join(__dirname, 'assignments.pug');
             const preview = await Cache.findOne({ dayWeekBegins }).lean();
 
@@ -187,7 +189,7 @@ module.exports = router => {
                 cleaning.cleaning_group_2.value = group.name;
             }
 
-            const { dayWeekBegins, dayWeekEnds } = getWeekSpan();
+            const { dayWeekBegins, dayWeekEnds } = getWeekSpan({ skippable: true });
             const currentCache = await Cache.findOne({ dayWeekBegins }).catch(console.error);
             const previewData = {
                 dayWeekBegins,
