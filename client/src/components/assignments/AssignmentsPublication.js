@@ -21,9 +21,69 @@ export default function AssignmentsPublication() {
     const { contactGroups } = store;
     const [success, setSuccess] = useState(false);
     const [modalMessage, setModalMessage] = useState(false);
+    const [modalCallback, setModalCallback] = useState(Function);
     const [loading, setLoading] = useState(false);
     const [loadingGroups, setLoadingGroups] = useState(false);
     const [checkboxes, setCheckbox] = useState([]);
+
+    // ---- BASIC ACTIONS
+
+    const handleLogin = async () => {
+        const { data: { redirectUrl } } = await axios.get(`${process.env.REACT_APP_ROOT}/auth`);
+
+        if (redirectUrl) {
+            setModalMessage(<>
+                <Typography variant="button" color="primary">Login necessário!</Typography>
+                <Typography variant="body1">
+                    Uma nova janela será aberta.
+                    Realize o login com sua conta do Google e tente enviar as designações novamente.
+                </Typography>
+            </>);
+
+            setModalCallback(() => function () {
+                window.open(redirectUrl);
+            });
+        } else {
+            setModalCallback(() => Function);
+            send();
+        }
+    };
+
+    const send = async () => {
+        try {
+            setLoading(true);
+
+            const { data } = await axios.post(`${process.env.REACT_APP_ROOT}/api/v1/assignments`, { groups: checkboxes });
+
+            setLoading(false);
+
+            if (!data) {
+                return setModalMessage(
+                    <Typography variant="button" color="primary">Erro desconhecido. Designações não enviadas!</Typography>
+                );
+            }
+
+            setSuccess(true);
+            dispatch({ type: 'SET_EMAIL_SENT', data: true });
+            setModalMessage(<>
+                <Typography variant="button" color="primary">Email enviado para o(s) grupo(s):</Typography>
+                {checkboxes.map(groupdId => {
+                    const { id, name } = contactGroups.find(cg => cg.id === groupdId) || {};
+                    return (<Typography variant="body1" key={id}>{name}</Typography>);
+                })}
+            </>);
+        } catch (error) {
+            setLoading(false);
+            setSuccess(false);
+        }
+    };
+
+    const onModalClose = () => {
+        setModalMessage(false);
+        modalCallback();
+    };
+
+    // ---- EFFECTS
 
     const getGroups = useCallback(async () => {
         try {
@@ -39,40 +99,27 @@ export default function AssignmentsPublication() {
         }
     }, [dispatch]);
 
-    const send = async () => {
-        try {
-            setLoading(true);
-
-            const { data } = await axios.post(`${process.env.REACT_APP_ROOT}/api/v1/assignments`, {
-                groups: checkboxes
-            });
-
-            if (data) {
-                setSuccess(true);
-                setLoading(false);
-                dispatch({ type: 'SET_EMAIL_SENT', data: true });
-                setModalMessage(<>
-                    <Typography variant="button" color="primary">Email enviado para o(s) grupo(s):</Typography>
-                    {checkboxes.map(groupdId => {
-                        const { id, name } = contactGroups.find(cg => cg.id === groupdId) || {};
-                        return (
-                            <Typography variant="body1" key={id}>{name}</Typography>
-                        )
-                    })}
-                </>);
-            }
-        } catch (error) {
-            setSuccess(false);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
         if (!contactGroups || !contactGroups.length) {
             getGroups();
         }
     }, [contactGroups, getGroups]);
+
+    // login handler
+    useEffect(() => {
+        const onMessage = message => {
+            if (new URL(message.origin).hostname === document.location.hostname && message.data.source === 'auth_callback') {
+                setModalMessage(false);
+                setLoading(false);
+            }
+        };
+        window.addEventListener('message', onMessage);
+        return () => {
+            window.removeEventListener('message', onMessage);
+        }
+    });
+
+    // ---- UI
 
     const theme = useTheme();
     const classes = makeStyles({
@@ -103,8 +150,8 @@ export default function AssignmentsPublication() {
                 isOpen={Boolean(modalMessage)}
                 content={modalMessage}
                 confirmOnly={true}
-                onClose={() => setModalMessage(false)}
-                onConfirm={() => setModalMessage(false)}
+                onClose={onModalClose}
+                onConfirm={onModalClose}
             />
 
             <Box className={classes.groupsBox}>
@@ -127,7 +174,7 @@ export default function AssignmentsPublication() {
                         </ListItem>
                     ))}
                 </List>
-                <FabLoadingProgress success={success} loading={loading} onClick={send} />
+                <FabLoadingProgress success={success} loading={loading} onClick={handleLogin} />
             </Box>
         </Paper >
     );

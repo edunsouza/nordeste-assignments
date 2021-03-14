@@ -28,7 +28,7 @@ export default function AssignmentsForm({ form }) {
 
     const fetchParts = useCallback(async () => {
         try {
-            const { data } = await axios.get(`${process.env.REACT_APP_ROOT}/api/v1/meeting-workbook`);
+            const { data } = await axios.get(`${process.env.REACT_APP_ROOT}/api/v1/workbook`);
             dispatch({ type: 'SET_PARTS', data });
         } catch {
             openModal({
