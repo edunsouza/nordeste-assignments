@@ -7,6 +7,9 @@ server/npm-debug.log*
 serverless/poller/.deta/
 serverless/poller/node_modules/
 serverless/poller/*.log
+serverless/auth/.deta/
+serverless/auth/node_modules/
+serverless/auth/*.log
 
 client/node_modules/
 client/package-lock.json
