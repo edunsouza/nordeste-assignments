@@ -19,6 +19,7 @@ module.exports = app => {
 
             res.status(200).json({ status: 'valid' });
         } catch (error) {
+            console.log(error.message || error);
             res.status(400).json({ status: 'unknown' });
         }
     });
@@ -36,7 +37,7 @@ module.exports = app => {
             const authPage = pug.renderFile(authPath);
             res.status(200).send(authPage);
         } catch (error) {
-            console.log(error)
+            console.log(error.message || error);
             res.status(400).json({ status: 'unknown' });
         }
     });
