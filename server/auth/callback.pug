@@ -1,0 +1,22 @@
+body(style="background-color: #582b7b; display: flex; flex-direction: column; text-align: center")
+    h1(style="color: #f2f2f2; font-family: Arial") Designator
+    h2(style="color: #f2f2f2; font-family: Arial") Esta janela se fechará em #[span(id="timer") 3] segundos...
+
+    script(type="text/javascript").
+        setTimeout(() => {
+            try {
+                window.opener.postMessage({ source: 'auth_callback', finished: true }, '*');
+                window.close();
+            } catch (error) {
+                console.log(error);
+            }
+        }, 3000);
+
+        const intervalId = setInterval(() => {
+            const time = document.querySelector('#timer');
+            if (Number(time.innerText) < 1) {
+                clearInterval(intervalId);
+            } else {
+                time.innerText = Number(time.innerText) - 1;
+            }
+        }, 1000);
