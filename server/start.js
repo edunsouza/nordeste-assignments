@@ -3,13 +3,37 @@ const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 
-const defineRoutes = require('./api');
-const app = express();
-const apiRouter = express.Router();
+const { Configs } = require('./models');
+const defineApiRoutes = require('./api');
+const defineAuthRoutes = require('./auth');
 
 const PORT = process.env.app_port || 8910;
 const MONGO_URI = process.env.mongodb || 'mongodb://localhost:27017/nordeste';
 const BUILD_FOLDER = path.join(__dirname, '..', 'client', 'build');
+
+const app = express();
+const apiRouter = express.Router();
+const authRouter = express.Router();
+
+async function setEnv() {
+    const keys = {
+        'sendgrid-api-key': 'SENDGRID_API_KEY',
+        'pepipost-api-key': 'PEPIPOST_API_KEY',
+        'sendgrid-from-email': 'SENDGRID_FROM_EMAIL',
+        'pepipost-from-email': 'PEPIPOST_FROM_EMAIL',
+        'reports-to-email': 'REPORTS_TO_EMAIL',
+    };
+
+    const configs = await Configs.find({
+        key: {
+            $in: Object.keys(keys)
+        }
+    }).lean();
+
+    configs.forEach(({ key, value }) => {
+        process.env[keys[key]] = value;
+    });
+}
 
 module.exports = async callback => {
     try {
@@ -17,6 +41,8 @@ module.exports = async callback => {
             useNewUrlParser: true,
             useUnifiedTopology: true
         });
+
+        setEnv();
 
         // settings
         app.use(cookieParser());
@@ -39,15 +65,17 @@ module.exports = async callback => {
             next();
         });
 
-        // api root
-        app.use('/api/v1', defineRoutes(apiRouter));
+        // main routes
+        app.use('/', defineAuthRoutes(authRouter));
+        app.use('/api/v1', defineApiRoutes(apiRouter));
 
         // otherwise api
         app.get('/api/*', (_, res) => res.status(404).json({ error: 'ENDEREÇO NÃO ENCONTRADO' }));
 
-        // client serving
+        // otherwise main routes
         app.get('*', (_, res) => {
-            if (process.env.NODE_ENV === 'PROD') {
+            if (['PROD', 'STATIC'].includes(process.env.NODE_ENV)) {
+                // client serving
                 res.sendFile(path.join(BUILD_FOLDER, 'index.html'));
             } else {
                 res.redirect('/api/v1');
@@ -57,6 +85,6 @@ module.exports = async callback => {
         // start
         app.listen(PORT, () => callback(PORT));
     } catch (error) {
-        console.error('<STARTUP>: [ERROR]', JSON.stringify(error, null, 4));
+        console.error('<STARTUP>: [ERROR]', error);
     }
 };

@@ -38,6 +38,32 @@ const Metrics = new Schema({
     reference: { type: Date, default: Date.now }
 });
 
+const Workbook = new Schema({
+    week: String,
+    year: String,
+    sections: [
+        new Schema({
+            id: String,
+            color: String,
+            tone: String,
+            itemsTone: String,
+            items: [
+                new Schema({
+                    id: String,
+                    text: String,
+                    hasPair: Boolean,
+                    isAssignable: Boolean,
+                    chairmanAssigned: Boolean,
+                    position: Number
+                }, { _id: false })
+            ],
+            position: Number,
+            title: String,
+        }, { _id: false })
+    ],
+    createdAt: { type: Date, default: Date.now }
+});
+
 module.exports = {
     Contacts: db.model('Contacts', Contacts, 'contacts'),
     ContactGroups: db.model('ContactGroups', ContactGroups, 'contactGroups'),
@@ -45,4 +71,5 @@ module.exports = {
     Configs: db.model('Configs', Configs, 'configs'),
     Cache: db.model('Cache', Cache, 'cache'),
     Metrics: db.model('Metrics', Metrics, 'metrics'),
+    Workbook: db.model('Workbook', Workbook, 'workbook'),
 };

@@ -1,117 +1,124 @@
 const path = require('path');
-const axios = require('axios');
-const cheerio = require('cheerio');
 const pug = require('pug');
 const { get, set } = require('lodash');
 
-const { Contacts, CleaningGroups, Cache, ContactGroups, Metrics } = require('./models');
-const {
-    encrypt,
-    decrypt,
-    sendEmail,
-    random,
-    capitalize,
-    getProperText,
-    getWeekSpan,
-    getDynamicUrls,
-    getWorkbookSkeleton,
-    toWorkbookItem,
-} = require('./helpers');
+const { Cache, Contacts, CleaningGroups, ContactGroups, Metrics, Workbook } = require('./models');
+const { encrypt, decrypt, random, capitalize, getProperText } = require('./utils');
+const { getWeekSpan, scrapeWorkbook, sendEmail, sendGmail, getGoogleAuth, getSession, clearSession } = require('./helpers');
 
-module.exports = app => {
-    app.get('/meeting-workbook', async (_, res) => {
+const findOrScrape = async (skippable, date) => {
+    try {
+        const { dayWeekBegins, dayWeekEnds } = getWeekSpan(true, date);
+        const week = `${dayWeekBegins}-${dayWeekEnds}`;
+        const success = true;
+
+        let workbook = await Workbook.findOne({ week }, { _id: 0, __v: 0 }).lean();
+
+        if (workbook) {
+            return { success, workbook };
+        }
+
+        const sections = await scrapeWorkbook({ skippable, date });
+
+        if (!sections) {
+            return {
+                success: false,
+                error: `workbook not found for week ${week}`
+            };
+        }
+
+        const wb = new Workbook({ week, sections });
+        await wb.save();
+
+        workbook = wb.toJSON();
+        delete workbook._id;
+        delete workbook.__v;
+
+        return { success, workbook };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+};
+
+module.exports = router => {
+    router.get('/workbook/:date', async (req, res) => {
         try {
-            const [workbookUrl, fallback] = getDynamicUrls();
-            const { data } = await axios.get(workbookUrl).catch(async () => await axios.get(fallback));
-            const $ = cheerio.load(data);
-            let sectionPosition = 1;
-            const meetingWorkbook = getWorkbookSkeleton().map(section => {
-                section.title = section.getTitle($);
-                section.position = sectionPosition++;
-                let itemPosition = 0;
-
-                $(section.itemsSelector).remove('.noMarker').each((_, e) => {
-                    const fullText = $(e).text();
-                    const item = toWorkbookItem(fullText.replace(/\n/g, '').trim());
-
-                    item.isAssignable = section.isAssignable(item.text);
-                    item.chairmanAssigned = section.chairmanAssigned(fullText);
-                    item.id += `_${++itemPosition}`;
-                    item.position = itemPosition;
-                    section.items.push(item);
-                });
-
-                delete section.itemsSelector;
-                return section;
-            });
-
-            res.status(200).json(meetingWorkbook);
+            const { success, workbook, error } = await findOrScrape(false, req.params.date);
+            if (success) {
+                res.status(200).json({ workbook });
+            } else {
+                res.status(400).json({ error });
+            }
         } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: error.message || error });
+        }
+    });
+
+    router.get('/workbook', async (req, res) => {
+        try {
+            const { success, workbook, error } = await findOrScrape(true, req.params.date);
+            if (success) {
+                res.status(200).json(workbook.sections);
+            } else {
+                res.status(400).json({ error });
+            }
+        } catch (error) {
+            console.log(error)
             console.error(JSON.stringify(error, null, 4));
             res.status(500).json({ error: 'Apostila não encontrada!' });
         }
     });
 
-    app.post('/attendance', async (req, res) => {
+    router.post('/assignments', async (req, res) => {
         try {
-            const { id, attendance } = req.body;
-
-            if (!id || !attendance) {
-                return res.status(400).json({ message: 'Métricas não informadas' });
-            }
-
-            await Metrics.create({
-                name: `meeting-attendance-${getProperText(id)}`,
-                value: attendance,
-                reference: new Date().toISOString(),
-            });
-
-            res.status(200).json({ message: `Assistência de ${attendance} registrada com sucesso` });
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: 'Não foi possível enviar as designações' });
-        }
-    });
-
-    app.post('/assignments', async (req, res) => {
-        try {
+            const { sessionId } = req.cookies;
             const { groups = [] } = req.body;
 
             if (!Array.isArray(groups) || !groups.length) {
                 return res.status(400).json({ message: 'Grupos não informados' });
             }
 
+            const groupsIn = { $in: groups.map(decrypt) };
+            const groupList = await ContactGroups.find({ _id: groupsIn }).lean();
+
+            const contactsIn = { $in: groupList.reduce((list, { contacts }) => [...list, ...contacts], []) };
+            const contactList = await Contacts.find({ _id: contactsIn }, { name: 1, address: 1 }).lean();
+
             const { dayWeekBegins, dayWeekEnds } = getWeekSpan();
-            const emailSubject = `DESIGNAÇÕES DA SEMANA (${dayWeekBegins} - ${dayWeekEnds})`;
-
+            const templatePath = path.join(__dirname, 'assignments.pug');
             const preview = await Cache.findOne({ dayWeekBegins }).lean();
-            const emailBody = pug.renderFile(
-                path.join(__dirname, 'assignments.pug'),
-                {
-                    ...preview,
-                    isMobile: false
+
+            const to = contactList.map(t => t.address);
+            const subject = `DESIGNAÇÕES DA SEMANA (${dayWeekBegins} - ${dayWeekEnds})`;
+            const content = pug.renderFile(templatePath, { ...preview, isMobile: false });
+
+            const auth = await getGoogleAuth();
+            const session = await getSession(sessionId);
+            auth.setCredentials(session);
+
+            if (!session || !auth) {
+                return res.status(500).json({ message: 'Sessão inválida! Designações não enviadas' });
+            }
+
+            // send
+            const success = await sendGmail(auth, to, subject, content).catch(async err => {
+                if (get(err, 'response.data.error') === 'invalid_grant') {
+                    console.log('session must be expired. Clearing old credentials');
+                    await clearSession(sessionId);
+                    return false;
                 }
-            );
 
-            const $in = (await ContactGroups
-                .find({ _id: { $in: groups.map(g => decrypt(g)) } })
-                .lean()
-            ).reduce((list, cg) => [...list, ...cg.contacts], []);
-
-            const emailList = (await Contacts
-                .find({ _id: { $in } }, { name: 1, address: 1 })
-                .lean()
-            ).map(e => ({
-                name: e.name,
-                email: e.address
-            }));
-
-            const success = process.env.NODE_ENV !== 'PROD'
-                ? true
-                : await sendEmail(emailList, emailSubject, emailBody);
+                // fallback
+                console.log('using alternative emailing service. Gmail failed with:', err);
+                return await sendEmail(to, subject, content);
+            });
 
             if (!success) {
-                res.status(500).json({ message: 'Não foi possível enviar as designações' });
+                res.status(500).json({ message: 'Não foi possível enviar as designações. Tente novamente' });
             } else {
                 res.status(200).json({ message: 'Designações enviadas por email' });
             }
@@ -121,7 +128,7 @@ module.exports = app => {
         }
     });
 
-    app.post('/assignments/preview', async (req, res) => {
+    router.post('/assignments/preview', async (req, res) => {
         try {
             const { weekend = {}, ministry = {}, week: weekArray = [], cleaning = {} } = req.body;
 
@@ -209,7 +216,8 @@ module.exports = app => {
             // clear other previews
             await Cache.deleteMany({ dayWeekBegins: { $nin: [dayWeekBegins] } });
 
-            const html = pug.renderFile(__dirname + '/assignments.pug', previewData);
+            const templatePath = path.join(__dirname, 'assignments.pug');
+            const html = pug.renderFile(templatePath, previewData);
 
             res.status(200).send(html);
         } catch (error) {
@@ -218,7 +226,28 @@ module.exports = app => {
         }
     });
 
-    app.get('/contacts', async (_, res) => {
+    router.post('/attendance', async (req, res) => {
+        try {
+            const { id, attendance } = req.body;
+
+            if (!id || !attendance) {
+                return res.status(400).json({ message: 'Métricas não informadas' });
+            }
+
+            await Metrics.create({
+                name: `meeting-attendance-${getProperText(id)}`,
+                value: attendance,
+                reference: new Date().toISOString(),
+            });
+
+            res.status(200).json({ message: `Assistência de ${attendance} registrada com sucesso` });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Não foi possível enviar as designações' });
+        }
+    });
+
+    router.get('/contacts', async (_, res) => {
         try {
             const contactList = await Contacts.find().lean();
 
@@ -235,7 +264,7 @@ module.exports = app => {
         }
     });
 
-    app.post('/contacts', async (req, res) => {
+    router.post('/contacts', async (req, res) => {
         try {
             const { name, address } = req.body;
 
@@ -271,7 +300,7 @@ module.exports = app => {
         }
     });
 
-    app.delete('/contacts/:id', async (req, res) => {
+    router.delete('/contacts/:id', async (req, res) => {
         try {
             const { id } = req.params;
 
@@ -292,7 +321,7 @@ module.exports = app => {
         }
     });
 
-    app.get('/contact-groups', async (_, res) => {
+    router.get('/contact-groups', async (_, res) => {
         try {
             const contactGroups = await ContactGroups.find().lean();
 
@@ -309,7 +338,7 @@ module.exports = app => {
         }
     });
 
-    app.post('/contact-groups', async (req, res) => {
+    router.post('/contact-groups', async (req, res) => {
         try {
             const { name, contacts } = req.body;
 
@@ -338,7 +367,7 @@ module.exports = app => {
         }
     });
 
-    app.delete('/contact-groups/:id', async (req, res) => {
+    router.delete('/contact-groups/:id', async (req, res) => {
         try {
             const { id } = req.params;
 
@@ -359,7 +388,7 @@ module.exports = app => {
         }
     });
 
-    app.get('/cleaning-groups', async (_, res) => {
+    router.get('/cleaning-groups', async (_, res) => {
         try {
             const cleaningGroups = await CleaningGroups.find().lean();
 
@@ -375,7 +404,7 @@ module.exports = app => {
         }
     });
 
-    app.post('/cleaning-groups', async (req, res) => {
+    router.post('/cleaning-groups', async (req, res) => {
         try {
             if (!req.body.name) {
                 return res.status(400).json({ error: 'Nome do grupo de limpeza não informado!' });
@@ -393,5 +422,5 @@ module.exports = app => {
         }
     });
 
-    return app;
+    return router;
 };

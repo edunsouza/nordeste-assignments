@@ -1,237 +1,303 @@
-const crypto = require('crypto');
 const moment = require('moment-timezone');
 const axios = require('axios');
+const cheerio = require('cheerio');
+const { google } = require('googleapis');
 const sendGridMail = require('@sendgrid/mail');
 
-const secret = {
-    algorithm: 'aes-256-ctr',
-    password: process.env.HASHING_KEY || 'devmode'
-};
+const { Configs } = require('./models');
+const { encrypt, decrypt, to64, random, getProperText } = require('./utils');
 
-const encrypt = value => {
-    const cipher = crypto.createCipher(secret.algorithm, secret.password);
-    const encrypted = cipher.update(String(value), 'utf8', 'hex');
-    return encrypted + cipher.final('hex');
-};
+function toTimezoneAndLocale(date) {
+    return moment(date || undefined).tz('America/Sao_Paulo').locale('pt-br');
+}
 
-const decrypt = value => {
-    const decipher = crypto.createDecipher(secret.algorithm, secret.password);
-    const decrypted = decipher.update(String(value), 'hex', 'utf8');
-    return decrypted + decipher.final('utf8');
-};
+function getWorkbookEndpoints(skippable, date) {
+    date = toTimezoneAndLocale(date);
 
-const random = (size = 10) => {
-    return [...Array(Math.ceil(size / 10))]
-        .reduce(r => r += Math.random().toString(36).substring(2, 12), '')
-        .substring(0, size);
-};
+    if (skippable && ['sex', 'sáb', 'dom'].includes(date.format('ddd'))) {
+        // jump to next week if today is Friday, Saturday or Sunday
+        date.add(1, 'week');
+    }
 
-const capitalize = text => {
-    return String(text)
-        .toLowerCase()
-        .replace(/(\b|^)[a-z]/g, match => match.toUpperCase())
-};
+    const week0 = date.clone().startOf('isoWeek');
+    const week1 = date.clone().endOf('isoWeek');
 
-const getProperText = text => {
-    text = text || '';
-    return text
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .trim()
-};
+    const [year0, year1] = [week0, week0.clone().add(1, 'y')].map(y => y.format('Y'));
+    const [month0, month1] = [week0, week1].map(m => m.format('MMMM'));
+    const [day0, day1] = [week0, week1].map(d => d.format('D'));
 
-const getUrlMonthRange = currentMonth => {
-    return {
-        1: ['janeiro', 'fevereiro'],
-        2: ['janeiro', 'fevereiro'],
-        3: ['marco', 'abril'],
-        4: ['marco', 'abril'],
-        5: ['maio', 'junho'],
-        6: ['maio', 'junho'],
-        7: ['julho', 'agosto'],
-        8: ['julho', 'agosto'],
-        9: ['setembro', 'outubro'],
-        10: ['setembro', 'outubro'],
-        11: ['novembro', 'dezembro'],
-        12: ['novembro', 'dezembro'],
-    }[currentMonth];
-};
+    const monthRange = [week0.clone(), week0.clone().add(1, 'month')];
+    // month range should always be: [odd month, even month]
+    if (week0.format('M') % 2 === 0) {
+        monthRange[0].subtract(1, 'month');
+        monthRange[1].subtract(1, 'month');
+    }
 
-const getDynamicUrls = () => {
-    const today = moment.tz('America/Sao_Paulo').add(shouldJumpToNextWeek() ? 1 : 0, 'week').locale('pt-br');
-    const weekStart = today.clone().startOf('isoWeek');
-    const weekEnd = today.clone().endOf('isoWeek');
-    const currentYear = weekStart.clone().startOf('year').format('Y');
-
-    const dayWeekStarts = weekStart.format('D');
-    const startingMonth = weekStart.format('MMMM');
-    const endingMonth = weekEnd.format('MMMM');
-    const currentMonthInterval = getUrlMonthRange(weekStart.format('M'));
-
-    const TEMPLATE_URL = '{M}-{M++}-{Y}-mwb/Programação-da-semana-de-{FROM}{0}-{TO}{1}-na-Apostila-da-Reunião-Vida-e-Ministério';
-
-    const endpoint = 'https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/' + TEMPLATE_URL
-        .replace('{M}', currentMonthInterval[0])
-        .replace('{M++}', currentMonthInterval[1])
-        .replace('{Y}', currentYear)
-        .replace('{TO}', `${weekEnd.format('D')}-de-${endingMonth}`)
-        .replace('{FROM}', startingMonth === endingMonth ? dayWeekStarts : [dayWeekStarts, 'de', startingMonth].join('-'));
+    const templateUrl = '{M1-M2}-{Y}-mwb/Programação-da-semana-de-{FROM}{0}-{TO}{1}-na-Apostila-da-Reunião-Vida-e-Ministério';
+    const endpoint = 'https://www.jw.org/pt/biblioteca/jw-apostila-do-mes/' + templateUrl
+        .replace('{M1-M2}', monthRange.map(mr => getProperText(mr.format('MMMM'))).join('-'))
+        .replace('{Y}', year0)
+        .replace('{TO}', `${day1}-de-${month1}`)
+        .replace('{FROM}', month0 === month1 ? day0 : [day0, 'de', month0].join('-'));
 
     return [
-        encodeURI(endpoint.replace('{0}', '').replace('{1}', `-de-${currentYear}`)),
-        encodeURI(endpoint.replace('{0}', `-de-${currentYear}`).replace('{1}', `-de-${parseInt(currentYear, 10) + 1}`)),
+        encodeURI(endpoint.replace('{0}', '').replace('{1}', `-de-${year0}`)),
+        encodeURI(endpoint.replace('{0}', `-de-${year0}`).replace('{1}', `-de-${year1}`)),
         encodeURI(endpoint.replace(/\{[01]\}/g, ''))
-    ]
-};
+    ];
+}
 
-const toWorkbookItem = scraped => {
-    const spruce = String(scraped).replace(/[:"'”“]|\s+/g, m => `"'”“`.split('').includes(m) ? '"' : ' ').trim();
-    const squeezed = getProperText(spruce).replace(/\s+/g, ' ');
-
-    const id = squeezed.match(/[^\(]+\(|[^\(]+/).pop().replace(/[)(\s\?]/g, '').toLowerCase();
-    const text = spruce.match(/[^\)]+\)|[^\)]+/).pop();
-    const hasPair = Boolean(!squeezed.match(/(discurso|leitura da biblia) \(/gi) && squeezed.match(/\(melhore licao|estudo biblico de congregacao/gi));
-
-    return { text, hasPair, id };
-};
-
-const shouldJumpToNextWeek = () => {
-    return ['sex', 'sáb', 'dom'].includes(moment.tz('America/Sao_Paulo').locale('pt-br').format('ddd').toLowerCase());
-};
-
-const getWeekSpan = () => {
-    const now = moment.tz('America/Sao_Paulo').locale('pt-br');
-
-    if (shouldJumpToNextWeek()) {
-        now.add(1, 'week');
-    }
-
+function getWeekSpan(withYear = false, date = null) {
+    const now = toTimezoneAndLocale(date);
+    const format = withYear ? 'DD/MM/YYYY' : 'DD/MM';
     return {
-        dayWeekBegins: now.startOf('isoWeek').format('DD/MM'),
-        dayWeekEnds: now.endOf('isoWeek').format('DD/MM')
+        dayWeekBegins: now.startOf('isoWeek').format(format),
+        dayWeekEnds: now.endOf('isoWeek').format(format)
     };
-};
+}
 
-const getWorkbookSkeleton = () => [
-    {
-        id: 'intro',
-        color: '#222222',
-        tone: '#ffffff',
-        getTitle: doc => `${doc('#p1').text()} | ${doc('#p2').text()}`,
-        isAssignable: part => Boolean(part.match(/(comentários iniciais)|(oração)/gi)),
-        chairmanAssigned: part => Boolean(part.match(/(comentários iniciais)/gi)),
-        items: [],
-        itemsSelector: '#p3,#p4',
-        itemsTone: '#222222',
-    },
-    {
-        id: 'treasures',
-        color: '#ffffff',
-        tone: '#606a70',
-        getTitle: doc => doc('#section2 .mwbHeadingIcon').text(),
-        isAssignable: () => true,
-        chairmanAssigned: () => false,
-        items: [],
-        itemsSelector: '*[class*=treasures] + .pGroup > ul > li',
-        itemsTone: '#606a70',
-    },
-    {
-        id: 'ministry',
-        color: '#ffffff',
-        tone: '#c18626',
-        getTitle: doc => doc('#section3 .mwbHeadingIcon').text(),
-        isAssignable: () => true,
-        chairmanAssigned: part => !part.match(/\(melhore lição/gi),
-        items: [],
-        itemsSelector: '*[class*=ministry] + .pGroup > ul > li',
-        itemsTone: '#c18626',
-    },
-    {
-        id: 'living',
-        color: '#ffffff',
-        tone: '#961526',
-        getTitle: doc => doc('#section4 .mwbHeadingIcon').text(),
-        isAssignable: part => Boolean(!part.match(/cântico/gi) || (part.match(/oração/gi))),
-        chairmanAssigned: part => Boolean(part.match(/comentários finais/gi)),
-        items: [],
-        itemsSelector: '*[class*=christianLiving] + .pGroup > ul > li',
-        itemsTone: '#961526',
+async function getGoogleAuth() {
+    const credentials = await Configs.findOne({ key: 'google-credentials' }).lean();
+    const { clientId, clientSecret } = JSON.parse(credentials.value);
+    const callbackHost = process.env.NODE_ENV !== 'PROD' ? 'http://localhost:8910' : 'https://jlt1y3.deta.dev';
+    return new google.auth.OAuth2(clientId, clientSecret, `${callbackHost}/callback`);
+}
+
+async function getGoogleRedirect() {
+    const auth = await getGoogleAuth();
+    return auth.generateAuthUrl({
+        access_type: 'offline',
+        scope: ['https://www.googleapis.com/auth/gmail.send']
+    });
+}
+
+async function getGoogleToken(authorizationCode) {
+    const auth = await getGoogleAuth();
+    const { tokens } = await auth.getToken(authorizationCode);
+    return tokens;
+}
+
+async function getSession(id) {
+    if (id) {
+        const session = await Configs.findOne({ key: id }).lean().catch(() => null);
+        if (session) {
+            return JSON.parse(decrypt(session.value));
+        }
     }
-];
+}
 
-/**
- * @to format: [{
- *      email: 'name@email.com',
- *      name: 'Name Example'
- * }]
-*/
-const sendEmail = async (to, subject, html) => {
-    const headers = {
-        'api_key': process.env.PEPIPOST_API_KEY,
-        'Content-Type': 'application/json;charset=UTF-8'
-    };
+async function createSession(data) {
+    const id = random();
+
+    await Configs.create({
+        key: id,
+        value: encrypt(JSON.stringify(data))
+    });
+
+    return id;
+}
+
+async function clearSession(id) {
+    if (id) {
+        return await Configs.deleteOne({ key: id });
+    }
+}
+
+// todo: rewrite
+async function scrapeWorkbook({ date, skippable } = {}) {
+    const skeleton = [
+        {
+            id: 'intro',
+            color: '#222222',
+            tone: '#ffffff',
+            getTitle: doc => `${doc('#p1').text()} | ${doc('#p2').text()}`,
+            isAssignable: part => Boolean(part.match(/(comentários iniciais)|(oração)/gi)),
+            chairmanAssigned: part => Boolean(part.match(/(comentários iniciais)/gi)),
+            items: [],
+            itemsSelector: '#p3,#p4',
+            itemsTone: '#222222',
+        },
+        {
+            id: 'treasures',
+            color: '#ffffff',
+            tone: '#606a70',
+            getTitle: doc => doc('#section2 .mwbHeadingIcon').text(),
+            isAssignable: () => true,
+            chairmanAssigned: () => false,
+            items: [],
+            itemsSelector: '*[class*=treasures] + .pGroup > ul > li',
+            itemsTone: '#606a70',
+        },
+        {
+            id: 'ministry',
+            color: '#ffffff',
+            tone: '#c18626',
+            getTitle: doc => doc('#section3 .mwbHeadingIcon').text(),
+            isAssignable: () => true,
+            chairmanAssigned: part => !part.match(/\(melhore lição/gi),
+            items: [],
+            itemsSelector: '*[class*=ministry] + .pGroup > ul > li',
+            itemsTone: '#c18626',
+        },
+        {
+            id: 'living',
+            color: '#ffffff',
+            tone: '#961526',
+            getTitle: doc => doc('#section4 .mwbHeadingIcon').text(),
+            isAssignable: part => Boolean(!part.match(/cântico/gi) || (part.match(/oração/gi))),
+            chairmanAssigned: part => Boolean(part.match(/comentários finais/gi)),
+            items: [],
+            itemsSelector: '*[class*=christianLiving] + .pGroup > ul > li',
+            itemsTone: '#961526',
+        }
+    ];
+
+    const [workbookUrl, fallback1, fallback2] = getWorkbookEndpoints(skippable, date);
+    const { data } = await axios.get(workbookUrl).catch(async () => {
+        return await axios.get(fallback1).catch(async () => {
+            return await axios.get(fallback2).catch(() => null);
+        });
+    });
+
+    if (!data) {
+        console.log('multiple attempts failed trying to get workbook endpoint');
+    }
+
+    const $ = cheerio.load(data);
+    let sectionPosition = 1;
+
+    return skeleton.map(section => {
+        section.title = section.getTitle($);
+        section.position = sectionPosition++;
+        let itemPosition = 0;
+
+        $(section.itemsSelector).remove('.noMarker').each((_, e) => {
+            const fullText = $(e).text();
+            const spruce = fullText.replace(/\n/g, '').replace(/[:"'”“]|\s+/g, m => `"'”“`.split('').includes(m) ? '"' : ' ').trim();
+            const squeezed = getProperText(spruce).replace(/\s+/g, ' ');
+
+            const item = {
+                position: itemPosition,
+                chairmanAssigned: section.chairmanAssigned(fullText),
+                hasPair: Boolean(!squeezed.match(/(discurso|leitura da biblia) \(/gi) && squeezed.match(/\(melhore licao|estudo biblico de congregacao/gi)),
+                text: spruce.match(/[^\)]+\)|[^\)]+/).pop(),
+                id: squeezed.match(/[^\(]+\(|[^\(]+/).pop().replace(/[)(\s\?\"\']/g, '').toLowerCase().concat(`_${++itemPosition}`),
+            };
+
+            item.isAssignable = section.isAssignable(item.text);
+
+            section.items.push(item);
+        });
+
+        delete section.itemsSelector;
+        return section;
+    });
+}
+
+// todo: rewrite - split into multiple functions
+async function sendEmail(to, subject, html) {
+    if (process.env.NODE_ENV !== 'PROD') {
+        to = [process.env.REPORTS_TO_EMAIL];
+    }
+
     const fromName = 'Nordeste Designações';
-    const body = {
-        from: { email: process.env.PEPIPOST_FROM_EMAIL, name: fromName },
-        subject: subject,
-        content: [{ type: 'html', value: html }],
-        personalizations: [{ to }]
+    const options = {
+        headers: {
+            'api_key': process.env.PEPIPOST_API_KEY,
+            'Content-Type': 'application/json; charset=UTF-8'
+        }
     };
+    const body1 = {
+        subject,
+        from: {
+            email: process.env.PEPIPOST_FROM_EMAIL,
+            name: fromName
+        },
+        content: [{
+            type: 'html',
+            value: html
+        }],
+        personalizations: [{
+            to: to.map(email => ({
+                email,
+                name: random()
+            }))
+        }]
+    };
+
     // first attempt
-    const { data: firstAttemptData } = await axios.post('https://api.pepipost.com/v5/mail/send', body, { headers }).catch(e => ({ data: { error: e } }));
+    const { data: first } = await axios.post('https://api.pepipost.com/v5/mail/send', body1, options).catch(error => {
+        return { data: { error } };
+    });
 
-    // backup - second attempt
-    if (!firstAttemptData || firstAttemptData.error) {
-        console.log('<EMAIL NOTIFICATION>: [FIRST ATTEMPT FAILED] - Pepipost error:', firstAttemptData.error);
+    // second attempt
+    if (!first || first.error) {
+        console.log(`${moment().format('DD/MM/YYYY HH:mm')} :::: <EMAIL NOTIFICATION>: [FIRST ATTEMPT FAILED] - Pepipost error:`, first.error.response.data);
 
-        const secondAttemptBody = {
+        const body2 = {
             from: `${fromName} <${process.env.SENDGRID_FROM_EMAIL}>`,
-            to: to.map(t => t.email),
+            to,
             subject,
             html,
-        }
+        };
 
         sendGridMail.setApiKey(process.env.SENDGRID_API_KEY);
-        const secondAttemptData = await sendGridMail.send(secondAttemptBody).catch(e => ({ error: e }));
+        const second = await sendGridMail.send(body2).catch(error => ({ error }));
 
-        if (!secondAttemptData || secondAttemptData.error) {
-            console.log('<EMAIL NOTIFICATION>: [SECOND ATTEMPT FAILED] - SendGrid error:', secondAttemptData.error);
+        if (!second || second.error) {
+            console.log(`${moment().format('DD/MM/YYYY HH:mm')} :::: <EMAIL NOTIFICATION>: [SECOND ATTEMPT FAILED] - SendGrid error:`, second.error);
             return false;
         }
+
+        console.log(`${moment().format('DD/MM/YYYY HH:mm')} :::: <EMAIL NOTIFICATION>: [EMAIL SENT ON 2nd ATTEMPT] - payload:`, second);
+        return {
+            success: true,
+            response: second
+        };
     }
 
-    console.log('<EMAIL NOTIFICATION>: [EMAIL SENT] - payload:', firstAttemptData);
-    return { success: firstAttemptData };
-};
+    console.log(`${moment().format('DD/MM/YYYY HH:mm')} :::: <EMAIL NOTIFICATION>: [EMAIL SENT ON 1st ATTEMPT] - payload:`, first);
+    return {
+        success: true,
+        response: first
+    };
+}
 
-/**
- * @to format: [{
- *      email: 'name@email.com',
- *      name: 'Name Example'
- * }]
-*/
-const sendGmail = async (to, subject, html) => {
-    // `
-    //     From: Me <${process.env.GMAIL_FROM_EMAIL}> 
-    //     To: You <email@gmail.com> 
-    //     Subject: test
-    //     Date: ${new Date().toGMTString()}
-    //     Message-ID: ${Math.random().toString(36).substring(2)}
+async function sendGmail(auth, to = [], subject, content) {
+    if (process.env.NODE_ENV !== 'PROD') {
+        to = [];
+    }
 
-    //     ${html}
-    // `
-};
+    to = [...to, process.env.REPORTS_TO_EMAIL];
+
+    const rfcContent = [
+        `From: Designator <me>`,
+        `To: ${to.join(', ')}`,
+        `Subject: =?utf-8?B?${to64(subject)}?=`,
+        `Date: ${new Date().toGMTString()}`,
+        `Content-Type: text/html; charset=UTF-8`,
+        `Message-ID: ${Math.random().toString(36).substring(2)}`,
+        '',
+        content
+    ].join('\n');
+
+    return await google.gmail({ version: 'v1', auth }).users.messages.send({
+        userId: 'me',
+        requestBody: {
+            raw: to64(rfcContent)
+        }
+    });
+}
 
 module.exports = {
-    encrypt,
-    decrypt,
     getWeekSpan,
-    random,
-    capitalize,
-    getProperText,
-    getDynamicUrls,
-    toWorkbookItem,
-    getWorkbookSkeleton,
-    sendEmail
+    getGoogleAuth,
+    getGoogleRedirect,
+    getGoogleToken,
+    getSession,
+    createSession,
+    clearSession,
+    scrapeWorkbook,
+    sendEmail,
+    sendGmail,
 };
