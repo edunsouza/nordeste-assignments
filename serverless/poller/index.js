@@ -1,6 +1,29 @@
-const express = require('express');
-const app = express();
+const { app } = require('deta');
+const axios = require('axios');
 
-app.get('/', (req, res) => res.status(200).json({ success: true }));
+const getNextMonday = () => {
+    const now = new Date();
+    const today = now.getDay();
+    const monday = 1;
+    const distance = monday - today;
 
-module.exports = app
+    now.setDate(now.getDate() + distance + 7);
+    now.setHours(12, 0, 0, 0);
+    return now.toISOString();
+};
+
+// every Monday 12 AM: 
+// deta cron set "0 12 ? * MON *"
+app.lib.cron(async event => {
+    const endpoint = `http://designacoes.edunsouza.xyz/workbook/${getNextMonday()}`;
+
+    const { data } = await axios(endpoint, { event }).catch(() => 'fail');
+
+    if (data === 'fail') {
+        console.error(`error trying to call ${endpoint}`);
+    } else {
+        console.log(`response from ${endpoint}:`, data);
+    }
+});
+
+module.exports = app;
