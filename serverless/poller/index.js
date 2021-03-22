@@ -12,10 +12,10 @@ const getNextMonday = () => {
     return now.toISOString();
 };
 
-// every Monday 12 AM: 
+// every Monday 12 PM: 
 // deta cron set "0 12 ? * MON *"
 app.lib.cron(async event => {
-    const endpoint = `http://designacoes.edunsouza.xyz/workbook/${getNextMonday()}`;
+    const endpoint = `http://designacoes.edunsouza.xyz/api/v1/workbook/${getNextMonday()}`;
 
     const { data } = await axios(endpoint, { event }).catch(() => 'fail');
 
